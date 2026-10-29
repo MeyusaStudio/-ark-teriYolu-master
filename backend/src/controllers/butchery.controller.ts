@@ -226,20 +226,14 @@ export async function createButcheryOperation(req: AuthRequest, res: Response): 
         t
       );
 
-      // Bağırsak parçası aynı zamanda raw_materials'a da kaydedilir
+      // Bağırsak parçası aynı zamanda raw_materials'a da kaydedilir (Hammaddeye otomatik aktarım)
       const partNameNorm = part.part_name.toLocaleLowerCase('tr-TR').trim();
-      if (partNameNorm === 'bağırsak') {
-        const animalLabel = animal_type.toLocaleLowerCase('tr-TR').includes('inek') || animal_type.toLocaleLowerCase('tr-TR').includes('dana')
-          ? 'İnek Bağırsağı'
-          : animal_type.toLocaleLowerCase('tr-TR').includes('koyun') || animal_type.toLocaleLowerCase('tr-TR').includes('kuzu')
-            ? 'Koyun Bağırsağı'
-            : `${animal_type} Bağırsağı`;
-
+      if (partNameNorm.includes('bağırsak') || partNameNorm.includes('bagirsak')) {
         await insertQuery(
           sequelize,
           `INSERT INTO raw_materials (owner_id, lot_id, material_type, quantity, unit, unit_price, total_cost, currency)
-           VALUES (?, ?, ?, ?, 'kg', ?, ?, ?)`,
-          [req.user!.id, lotId, animalLabel, part.actual_weight_kg, part.unitCost, part.allocatedCost, curr],
+           VALUES (?, ?, 'Bağırsak', ?, 'kg', ?, ?, ?)`,
+          [req.user!.id, lotId, part.actual_weight_kg, part.unitCost, part.allocatedCost, curr],
           t
         );
       }

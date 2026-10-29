@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 data class PartSuitabilityResult(
     val status: String, // "recommended", "warning", "unsuitable", "neutral"
@@ -49,6 +50,7 @@ data class ProducerListingsUiState(
     // Order Creation State (Hayvancı)
     val isOrdering: Boolean = false,
     val selectedListingForOrder: ProducerListing? = null,
+    val orderAnimalFilter: String? = null, // "koyun", "inek", "tavuk"
     val selectedPart: AvailablePart? = null,
     val selectedPartKg: Double = 0.0,
     val stockSelections: Map<String, Double> = emptyMap(), // materialName -> kg
@@ -88,6 +90,45 @@ data class ProducerListingsUiState(
 
     val hasActiveFilters: Boolean
         get() = selectedProductFilter != null || selectedAnimalFilter != null || searchQuery.isNotBlank()
+
+    val orderFilteredMeats: List<AvailablePart>
+        get() {
+            if (orderAnimalFilter.isNullOrBlank()) return allAvailableMeats
+            val target = orderAnimalFilter.lowercase()
+            return allAvailableMeats.filter {
+                val a = it.animalType.lowercase()
+                when {
+                    target.contains("koyun") || target.contains("kuzu") -> a.contains("koyun") || a.contains("kuzu")
+                    target.contains("inek") || target.contains("dana") -> a.contains("inek") || a.contains("dana")
+                    target.contains("tavuk") || target.contains("pilic") -> a.contains("tavuk")
+                    else -> a.contains(target)
+                }
+            }
+        }
+
+    fun getMissingStockMaterials(listing: ProducerListing?): List<String> {
+        if (listing == null || selectedPartKg <= 0) return emptyList()
+        val mats = listing.requiredMaterialsParsed.filterKeys { !it.contains("et", ignoreCase = true) }
+        if (mats.isEmpty()) return emptyList()
+        val etEntry = listing.requiredMaterialsParsed.entries.firstOrNull { it.key.contains("et", ignoreCase = true) }
+        val etBaseline = etEntry?.value?.amount?.takeIf { it > 0 } ?: 1.0
+        val factor = selectedPartKg / etBaseline
+
+        val missing = mutableListOf<String>()
+        mats.forEach { (matName, spec) ->
+            val needed = stockSelections[matName] ?: (Math.round(spec.amount * factor * 100.0) / 100.0)
+            if (needed > 0) {
+                val stockItem = rawMaterialsStock.find {
+                    it.materialType.contains(matName, ignoreCase = true) && it.lotStatus == "active"
+                }
+                val avail = stockItem?.quantity ?: 0.0
+                if (avail < needed || avail <= 0.0) {
+                    missing.add("$matName (İhtiyaç: ${String.format(Locale.US, "%.2f", needed)} ${spec.unit}, Depo: ${String.format(Locale.US, "%.2f", avail)} ${spec.unit})")
+                }
+            }
+        }
+        return missing
+    }
 
     val filteredListings: List<ProducerListing>
         get() {
@@ -290,10 +331,22 @@ class ProducerListingsViewModel(application: Application) : AndroidViewModel(app
         _uiState.update {
             it.copy(
                 selectedListingForOrder = listing,
+                orderAnimalFilter = null,
                 selectedPart = null,
                 selectedPartKg = 0.0,
                 stockSelections = emptyMap(),
                 orderNote = ""
+            )
+        }
+    }
+
+    fun setOrderAnimalFilter(animal: String?) {
+        _uiState.update {
+            val isCurrentPartValid = animal == null || it.selectedPart == null || it.selectedPart.animalType.contains(animal, ignoreCase = true)
+            it.copy(
+                orderAnimalFilter = animal,
+                selectedPart = if (isCurrentPartValid) it.selectedPart else null,
+                selectedPartKg = if (isCurrentPartValid) it.selectedPartKg else 0.0
             )
         }
     }
@@ -429,6 +482,23 @@ class ProducerListingsViewModel(application: Application) : AndroidViewModel(app
 
         if (state.selectedPart == null || state.selectedPartKg <= 0) {
             _uiState.update { it.copy(errorMessage = "Lütfen üretilecek ürün için kendi deponuzdan bir et parçası seçiniz.") }
+            return
+        }
+
+        if (state.selectedPartKg > state.selectedPart.availableKg) {
+            _uiState.update {
+                it.copy(errorMessage = "Girdiğiniz et miktarı (${state.selectedPartKg} kg), depodaki mevcut stoktan (${state.selectedPart.availableKg} kg) fazladır.")
+            }
+            return
+        }
+
+        val missing = state.getMissingStockMaterials(listing)
+        if (missing.isNotEmpty()) {
+            _uiState.update {
+                it.copy(
+                    errorMessage = "Deponuzda şu ürünler eksik veya yetersiz: ${missing.joinToString(", ")}. Depoda malzeme bulunmadan sipariş tamamlanamaz."
+                )
+            }
             return
         }
 

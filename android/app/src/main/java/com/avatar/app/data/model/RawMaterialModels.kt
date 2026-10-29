@@ -82,6 +82,7 @@ object RawMaterialPresets {
         RawMaterialPreset("Salça", "kg", "Sebze/Meyve", 2.80),
         RawMaterialPreset("Yoğurt", "kg", "Süt/Yumurta", 1.80),
         RawMaterialPreset("Yumurta Akı", "lt", "Süt/Yumurta", 3.00),
+        RawMaterialPreset("Bağırsak", "kg", "Bağırsak", 8.50),
         RawMaterialPreset("İnek Bağırsağı", "kg", "Bağırsak", 8.00),
         RawMaterialPreset("Koyun Bağırsağı", "kg", "Bağırsak", 9.50)
     )

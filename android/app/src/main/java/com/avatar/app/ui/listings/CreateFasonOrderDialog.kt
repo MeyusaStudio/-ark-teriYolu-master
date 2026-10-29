@@ -3,15 +3,18 @@ package com.avatar.app.ui.listings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ElectricBolt
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,9 +43,17 @@ fun CreateFasonOrderDialog(
         listing.requiredMaterialsParsed.filterKeys { !it.contains("et", ignoreCase = true) }
     }
 
+    val missingMaterials = remember(state.selectedPartKg, state.stockSelections, state.rawMaterialsStock) {
+        state.getMissingStockMaterials(listing)
+    }
+
     val totalStockKg = state.stockSelections.values.sum()
     val totalInputKg = state.selectedPartKg + totalStockKg
     val expectedPackages = if (totalInputKg > 0) kotlin.math.max(1, kotlin.math.floor(totalInputKg / 1.0).toInt()) else 0
+
+    val isMeatOk = state.selectedPart != null && state.selectedPartKg > 0 && state.selectedPartKg <= (state.selectedPart?.availableKg ?: 0.0)
+    val isStockOk = missingMaterials.isEmpty()
+    val canSubmit = !state.isOrdering && isMeatOk && isStockOk
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -91,7 +102,7 @@ fun CreateFasonOrderDialog(
                                 onClick = {
                                     viewModel.submitOrder(onSuccess = onDismiss)
                                 },
-                                enabled = !state.isOrdering && state.selectedPart != null && state.selectedPartKg > 0,
+                                enabled = canSubmit,
                                 colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
                                 modifier = Modifier.weight(2f)
                             ) {
@@ -102,7 +113,10 @@ fun CreateFasonOrderDialog(
                                 } else {
                                     Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Siparişi Gönder", fontWeight = FontWeight.Bold)
+                                    Text(
+                                        if (!isStockOk) "Eksik Hammadde Var" else "Siparişi Gönder",
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                         }
@@ -146,22 +160,65 @@ fun CreateFasonOrderDialog(
                         }
                     }
 
-                    // 1. Kendi Depondan Et Parçası Seç
+                    // 1. Hayvan Türü Seçimi
                     item {
                         Text(
-                            "1. Kendi Deponuzdaki Et Parçasını Seçiniz",
+                            "1. Göndermek İstediğiniz Hayvanı Seçiniz",
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            "Parçalama işleminizden oluşan veya depoda bulunan aktif et lotları:",
+                            "Deponuzdaki etleri filtrelemek için önce hayvan türünü seçin:",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = state.orderAnimalFilter == null,
+                                onClick = { viewModel.setOrderAnimalFilter(null) },
+                                label = { Text("🐾 Tümü (${state.totalAvailMeatKg.toInt()} kg)", fontSize = 12.sp) }
+                            )
+                            FilterChip(
+                                selected = state.orderAnimalFilter == "koyun",
+                                onClick = { viewModel.setOrderAnimalFilter("koyun") },
+                                label = { Text("🐑 Koyun/Kuzu (${state.getAnimalMeatKg("koyun").toInt()} kg)", fontSize = 12.sp) }
+                            )
+                            FilterChip(
+                                selected = state.orderAnimalFilter == "inek",
+                                onClick = { viewModel.setOrderAnimalFilter("inek") },
+                                label = { Text("🐄 İnek/Dana (${state.getAnimalMeatKg("inek").toInt()} kg)", fontSize = 12.sp) }
+                            )
+                            FilterChip(
+                                selected = state.orderAnimalFilter == "tavuk",
+                                onClick = { viewModel.setOrderAnimalFilter("tavuk") },
+                                label = { Text("🐔 Tavuk (${state.getAnimalMeatKg("tavuk").toInt()} kg)", fontSize = 12.sp) }
+                            )
+                        }
+                    }
+
+                    // 2. Kendi Depondan Et Parçası Seç
+                    item {
+                        Text(
+                            "2. Kendi Deponuzdaki Et Parçasını Seçiniz",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            "Seçilen hayvana ait parçalama veya aktif et lotları:",
                             fontSize = 11.sp,
                             color = Color.Gray
                         )
                     }
 
-                    if (state.allAvailableMeats.isEmpty()) {
+                    if (state.orderFilteredMeats.isEmpty()) {
                         item {
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF1F2)),
@@ -169,13 +226,13 @@ fun CreateFasonOrderDialog(
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Text(
-                                        "⚠️ Deponuzda hazır et bulunamadı!",
+                                        "⚠️ Bu hayvana ait hazır et bulunamadı!",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 12.sp,
                                         color = Color(0xFF991B1B)
                                     )
                                     Text(
-                                        "Lütfen önce 'Parçalama' sekmesinden bir kuzu/dana parçalama işlemi gerçekleştirin veya depoya hammadde ekleyin.",
+                                        "Lütfen başka bir hayvan türü seçiniz veya 'Parçalama' sekmesinden yeni bir hayvan parçalayınız.",
                                         fontSize = 11.sp,
                                         color = Color(0xFFB91C1C)
                                     )
@@ -183,7 +240,7 @@ fun CreateFasonOrderDialog(
                             }
                         }
                     } else {
-                        items(state.allAvailableMeats) { part ->
+                        items(state.orderFilteredMeats) { part ->
                             val isSelected = state.selectedPart?.lotId == part.lotId
                             val suitability = viewModel.checkPartSuitability(listing.productName, part.partName)
                             val suitBg = when (suitability.status) {
@@ -256,6 +313,12 @@ fun CreateFasonOrderDialog(
                                                     viewModel.selectPartForOrder(part, v)
                                                 },
                                                 label = { Text("Üretime Verilecek Miktar (kg)", fontSize = 11.sp) },
+                                                isError = state.selectedPartKg > part.availableKg,
+                                                supportingText = {
+                                                    if (state.selectedPartKg > part.availableKg) {
+                                                        Text("Mevcut stoktan (${part.availableKg} kg) fazla girilemez!", color = Color.Red, fontSize = 10.sp)
+                                                    }
+                                                },
                                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                                 modifier = Modifier.weight(1f),
                                                 singleLine = true,
@@ -274,7 +337,7 @@ fun CreateFasonOrderDialog(
                         }
                     }
 
-                    // 2. Diğer Reçete Hammaddeleri (Reçeteye Göre Otomatik Doldurma)
+                    // 3. Diğer Reçete Hammaddeleri (Reçeteye Göre Otomatik Doldurma & Stok Kontrolü)
                     item {
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(
@@ -284,13 +347,13 @@ fun CreateFasonOrderDialog(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    "2. Reçete Hammaddeleri",
+                                    "3. Reçete Hammaddeleri & Depo Kontrolü",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
-                                    "Üreticinin reçetesine göre otomatik hesaplanan girdi miktarları:",
+                                    "Reçeteye göre hesaplanan malzemeler deponuzdaki stokla kontrol edilir:",
                                     fontSize = 11.sp,
                                     color = Color.Gray
                                 )
@@ -310,6 +373,34 @@ fun CreateFasonOrderDialog(
                         }
                     }
 
+                    // Eksik Stok Uyarısı
+                    if (missingMaterials.isNotEmpty()) {
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFCA5A5)),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFDC2626), modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text("⚠️ Depoda Yetersiz / Eksik Ürünler!", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF991B1B))
+                                        Text(
+                                            "Deponuzda bu ürünler olmadan sipariş verilemez. Eksik olanlar: ${missingMaterials.joinToString("; ")}",
+                                            fontSize = 11.sp,
+                                            color = Color(0xFFB91C1C),
+                                            lineHeight = 15.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     if (recipeIngredients.isNotEmpty()) {
                         items(recipeIngredients.keys.toList()) { matName ->
                             val spec = recipeIngredients[matName]
@@ -318,14 +409,14 @@ fun CreateFasonOrderDialog(
                                 it.materialType.contains(matName, ignoreCase = true) && it.lotStatus == "active"
                             }
                             val availStockKg = stockItem?.quantity ?: 0.0
-                            val hasEnough = availStockKg >= currentQty
+                            val hasEnough = stockItem != null && availStockKg >= currentQty && availStockKg > 0
 
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                 shape = RoundedCornerShape(8.dp),
                                 border = androidx.compose.foundation.BorderStroke(
                                     1.dp,
-                                    if (currentQty > 0 && !hasEnough) Color(0xFFFDBA74) else Color(0xFFE2E8F0)
+                                    if (currentQty > 0 && !hasEnough) Color(0xFFEF4444) else Color(0xFFE2E8F0)
                                 )
                             ) {
                                 Row(
@@ -336,7 +427,22 @@ fun CreateFasonOrderDialog(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(matName, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(matName, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = if (hasEnough) Color(0xFFDCFCE7) else Color(0xFFFEE2E2)
+                                            ) {
+                                                Text(
+                                                    text = if (hasEnough) "✓ Stokta Var" else "✗ Depoda Yok",
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (hasEnough) ForestGreen else Color(0xFFDC2626),
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
                                         Text(
                                             "Reçete: ${spec?.amount ?: 1.0} ${spec?.unit ?: "kg"}/birim",
                                             fontSize = 10.sp,
@@ -346,14 +452,15 @@ fun CreateFasonOrderDialog(
                                             Text(
                                                 "Deponuzda: ${String.format(Locale.US, "%.2f", availStockKg)} ${stockItem.unit} (${stockItem.lotNumber})",
                                                 fontSize = 10.sp,
-                                                color = if (hasEnough) ForestGreen else Color(0xFFC2410C),
+                                                color = if (hasEnough) ForestGreen else Color(0xFFDC2626),
                                                 fontWeight = FontWeight.Medium
                                             )
                                         } else {
                                             Text(
-                                                "Depoda lot bulunamadı (Üreticiye iletilecek)",
+                                                "Depoda aktif lot kaydı bulunmuyor!",
                                                 fontSize = 10.sp,
-                                                color = Color.Gray
+                                                color = Color(0xFFDC2626),
+                                                fontWeight = FontWeight.Medium
                                             )
                                         }
                                     }
@@ -410,7 +517,7 @@ fun CreateFasonOrderDialog(
                         }
                     }
 
-                    // 3. Sipariş Özeti Kartı
+                    // 4. Sipariş Özeti Kartı
                     if (state.selectedPartKg > 0) {
                         item {
                             Card(

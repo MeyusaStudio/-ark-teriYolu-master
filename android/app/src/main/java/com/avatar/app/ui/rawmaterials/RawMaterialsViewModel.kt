@@ -39,8 +39,14 @@ data class RawMaterialsUiState(
         get() {
             if (filteredCategory.isNullOrBlank()) return materials
             return materials.filter { m ->
-                val preset = RawMaterialPresets.ITEMS.find { it.label.equals(m.materialType, ignoreCase = true) }
-                preset?.category == filteredCategory
+                val cat = when {
+                    m.materialType.contains("bağırsak", ignoreCase = true) || m.materialType.contains("bagirsak", ignoreCase = true) -> "Bağırsak"
+                    m.isMeat() -> "Et"
+                    else -> RawMaterialPresets.ITEMS.find {
+                        it.label.contains(m.materialType, ignoreCase = true) || m.materialType.contains(it.label, ignoreCase = true)
+                    }?.category ?: "Diğer"
+                }
+                cat.equals(filteredCategory, ignoreCase = true)
             }
         }
 }
