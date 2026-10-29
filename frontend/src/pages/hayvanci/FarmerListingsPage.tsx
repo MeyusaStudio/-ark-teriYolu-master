@@ -82,10 +82,10 @@ export default function FarmerListingsPage() {
   async function loadLots() {
     try {
       const { data } = await lotService.getAll();
-      // Sadece aktif parça ve mamul lotlar
+      // Sadece aktif mamul lotlar (sucuk, salam, sosis, pastırma - çiğ et hariç)
       setLots((data as Lot[]).filter(l =>
         l.status === 'active' &&
-        (l.lot_type === 'parca' || l.lot_type === 'mamul') &&
+        l.lot_type === 'mamul' &&
         Number(l.quantity) > 0
       ));
     } catch {

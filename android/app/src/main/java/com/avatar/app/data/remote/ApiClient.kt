@@ -74,6 +74,9 @@ class ApiClient(private val context: Context) {
     val mlService: MlApiService
         get() = retrofit.create(MlApiService::class.java)
 
+    val purchaseService: PurchaseApiService
+        get() = retrofit.create(PurchaseApiService::class.java)
+
     fun parseError(responseBodyString: String?): String {
         if (responseBodyString.isNullOrBlank()) return "Bilinmeyen bir hata oluştu"
         return try {

@@ -113,10 +113,10 @@ router.get('/farmer/mine', authorize('hayvanci'), async (req: AuthRequest, res) 
   try {
     const listings = await selectQuery(
       sequelize,
-      `SELECT fl.*, l.lot_number, l.quantity as lot_quantity, l.status as lot_status
+      `SELECT fl.*, l.lot_number, l.quantity as lot_quantity, l.status as lot_status, l.lot_type
        FROM farmer_listings fl
        JOIN lots l ON fl.lot_id = l.id
-       WHERE fl.farmer_id = ?
+       WHERE fl.farmer_id = ? AND l.lot_type = 'mamul'
        ORDER BY fl.created_at DESC`,
       [req.user!.id]
     );
@@ -131,11 +131,11 @@ router.get('/farmer', async (_req, res) => {
   try {
     const listings = await selectQuery(
       sequelize,
-      `SELECT fl.*, u.name as farmer_name, u.phone, l.lot_number, l.status as lot_status
+      `SELECT fl.*, u.name as farmer_name, u.phone, l.lot_number, l.status as lot_status, l.lot_type
        FROM farmer_listings fl
        JOIN users u ON fl.farmer_id = u.id
        JOIN lots l ON fl.lot_id = l.id
-       WHERE fl.is_active = 1 AND l.status = 'active'
+       WHERE fl.is_active = 1 AND l.status = 'active' AND l.lot_type = 'mamul'
        ORDER BY fl.created_at DESC`,
       []
     );
@@ -150,6 +150,24 @@ router.post('/farmer', authorize('hayvanci'), async (req: AuthRequest, res) => {
   const { lot_id, product_name, quantity, unit, unit_price, currency, description } = req.body;
   const curr = currency ? String(currency).trim().toUpperCase() : 'EUR';
   try {
+    const lotRows = await selectQuery<{ id: number; lot_type: string; status: string; quantity: number }>(
+      sequelize,
+      `SELECT id, lot_type, status, quantity FROM lots WHERE id = ? AND owner_id = ?`,
+      [lot_id, req.user!.id]
+    );
+
+    if (lotRows.length === 0) {
+      res.status(404).json({ error: 'Seçilen lot bulunamadı veya size ait değil' });
+      return;
+    }
+
+    if (lotRows[0].lot_type !== 'mamul') {
+      res.status(400).json({
+        error: 'Satış sadece sucuk, salam, sosis, pastırma gibi fason mamul ürünler için yapılabilir. Çiğ et parçaları ilana koyulamaz.'
+      });
+      return;
+    }
+
     const listingId = await insertQuery(
       sequelize,
       `INSERT INTO farmer_listings (farmer_id, lot_id, product_name, quantity, unit, unit_price, currency, description)

@@ -21,17 +21,26 @@ import com.avatar.app.ui.auth.AuthViewModel
 import com.avatar.app.ui.butchery.ButcheryScreen
 import com.avatar.app.ui.butchery.ButcheryViewModel
 import com.avatar.app.ui.components.ServerConfigDialog
+import com.avatar.app.ui.listings.FarmerListingsScreen
+import com.avatar.app.ui.listings.FarmerListingsViewModel
 import com.avatar.app.ui.listings.ProducerListingsManageScreen
 import com.avatar.app.ui.listings.ProducerListingsScreen
 import com.avatar.app.ui.listings.ProducerListingsViewModel
 import com.avatar.app.ui.lots.LotsScreen
 import com.avatar.app.ui.lots.LotsViewModel
+import com.avatar.app.ui.market.MarketListingsScreen
+import com.avatar.app.ui.market.MarketPurchasesScreen
+import com.avatar.app.ui.market.MarketViewModel
 import com.avatar.app.ui.orders.OrdersScreen
 import com.avatar.app.ui.orders.OrdersViewModel
 import com.avatar.app.ui.production.ProductionScreen
 import com.avatar.app.ui.production.ProductionViewModel
 import com.avatar.app.ui.rawmaterials.RawMaterialsScreen
 import com.avatar.app.ui.rawmaterials.RawMaterialsViewModel
+import com.avatar.app.ui.recalls.RecallsScreen
+import com.avatar.app.ui.recalls.RecallsViewModel
+import com.avatar.app.ui.sales.FarmerSalesScreen
+import com.avatar.app.ui.sales.FarmerSalesViewModel
 import com.avatar.app.ui.theme.*
 
 @Composable
@@ -43,9 +52,13 @@ fun HomeScreen(
     val butcheryViewModel: ButcheryViewModel = viewModel()
     val rawMaterialsViewModel: RawMaterialsViewModel = viewModel()
     val listingsViewModel: ProducerListingsViewModel = viewModel()
+    val farmerListingsViewModel: FarmerListingsViewModel = viewModel()
     val ordersViewModel: OrdersViewModel = viewModel()
+    val farmerSalesViewModel: FarmerSalesViewModel = viewModel()
     val productionViewModel: ProductionViewModel = viewModel()
     val lotsViewModel: LotsViewModel = viewModel()
+    val recallsViewModel: RecallsViewModel = viewModel()
+    val marketViewModel: MarketViewModel = viewModel()
 
     val role = user.role.lowercase()
 
@@ -74,14 +87,14 @@ fun HomeScreen(
                     NavigationBarItem(
                         selected = selectedTab == 3,
                         onClick = { selectedTab = 3 },
-                        icon = { Icon(Icons.Default.LocalShipping, contentDescription = "Siparişler") },
-                        label = { Text("Siparişler", fontSize = 9.sp) }
+                        icon = { Icon(Icons.Default.LocalShipping, contentDescription = "Sipariş ve Satış") },
+                        label = { Text("Sipariş/Satış", fontSize = 8.sp) }
                     )
                     NavigationBarItem(
                         selected = selectedTab == 4,
                         onClick = { selectedTab = 4 },
-                        icon = { Icon(Icons.Default.QrCode, contentDescription = "Lotlar") },
-                        label = { Text("Lotlar", fontSize = 9.sp) }
+                        icon = { Icon(Icons.Default.QrCode, contentDescription = "Lotlar ve Recall") },
+                        label = { Text("Lot/Recall", fontSize = 8.sp) }
                     )
                     NavigationBarItem(
                         selected = selectedTab == 5,
@@ -142,9 +155,9 @@ fun HomeScreen(
                 when (selectedTab) {
                     0 -> ButcheryScreen(viewModel = butcheryViewModel)
                     1 -> RawMaterialsScreen(viewModel = rawMaterialsViewModel)
-                    2 -> ProducerListingsScreen(viewModel = listingsViewModel)
-                    3 -> OrdersScreen(user = user, viewModel = ordersViewModel)
-                    4 -> LotsScreen(viewModel = lotsViewModel)
+                    2 -> HayvanciListingsContainer(producerViewModel = listingsViewModel, farmerViewModel = farmerListingsViewModel)
+                    3 -> HayvanciOrdersAndSalesContainer(user = user, ordersViewModel = ordersViewModel, salesViewModel = farmerSalesViewModel)
+                    4 -> HayvanciLotsAndRecallsContainer(lotsViewModel = lotsViewModel, recallsViewModel = recallsViewModel)
                     5 -> ProfileScreen(user = user, authViewModel = authViewModel)
                 }
             } else if (role == "sucukcu") {
@@ -156,10 +169,110 @@ fun HomeScreen(
                 }
             } else {
                 when (selectedTab) {
-                    0 -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Market İlanları (Sıradaki Adım)") }
-                    1 -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Satın Aldıklarım (Sıradaki Adım)") }
+                    0 -> MarketListingsScreen(viewModel = marketViewModel)
+                    1 -> MarketPurchasesScreen(viewModel = marketViewModel)
                     2 -> ProfileScreen(user = user, authViewModel = authViewModel)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun HayvanciListingsContainer(
+    producerViewModel: ProducerListingsViewModel,
+    farmerViewModel: FarmerListingsViewModel
+) {
+    var subTab by remember { mutableIntStateOf(0) }
+    Column(modifier = Modifier.fillMaxSize()) {
+        TabRow(
+            selectedTabIndex = subTab,
+            containerColor = Color.White,
+            contentColor = PrimaryBlue
+        ) {
+            Tab(
+                selected = subTab == 0,
+                onClick = { subTab = 0 },
+                text = { Text("Fason İlanlar", fontWeight = FontWeight.SemiBold, fontSize = 12.sp) }
+            )
+            Tab(
+                selected = subTab == 1,
+                onClick = { subTab = 1 },
+                text = { Text("Mamul İlanlarım", fontWeight = FontWeight.SemiBold, fontSize = 12.sp) }
+            )
+        }
+        Box(modifier = Modifier.weight(1f)) {
+            if (subTab == 0) {
+                ProducerListingsScreen(viewModel = producerViewModel)
+            } else {
+                FarmerListingsScreen(viewModel = farmerViewModel)
+            }
+        }
+    }
+}
+
+@Composable
+fun HayvanciOrdersAndSalesContainer(
+    user: User,
+    ordersViewModel: OrdersViewModel,
+    salesViewModel: FarmerSalesViewModel
+) {
+    var subTab by remember { mutableIntStateOf(0) }
+    Column(modifier = Modifier.fillMaxSize()) {
+        TabRow(
+            selectedTabIndex = subTab,
+            containerColor = Color.White,
+            contentColor = ForestGreen
+        ) {
+            Tab(
+                selected = subTab == 0,
+                onClick = { subTab = 0 },
+                text = { Text("Fason Siparişler", fontWeight = FontWeight.SemiBold, fontSize = 12.sp) }
+            )
+            Tab(
+                selected = subTab == 1,
+                onClick = { subTab = 1 },
+                text = { Text("Market Satışlarım", fontWeight = FontWeight.SemiBold, fontSize = 12.sp) }
+            )
+        }
+        Box(modifier = Modifier.weight(1f)) {
+            if (subTab == 0) {
+                OrdersScreen(user = user, viewModel = ordersViewModel)
+            } else {
+                FarmerSalesScreen(viewModel = salesViewModel)
+            }
+        }
+    }
+}
+
+@Composable
+fun HayvanciLotsAndRecallsContainer(
+    lotsViewModel: LotsViewModel,
+    recallsViewModel: RecallsViewModel
+) {
+    var subTab by remember { mutableIntStateOf(0) }
+    Column(modifier = Modifier.fillMaxSize()) {
+        TabRow(
+            selectedTabIndex = subTab,
+            containerColor = Color.White,
+            contentColor = Color(0xFFDC2626)
+        ) {
+            Tab(
+                selected = subTab == 0,
+                onClick = { subTab = 0 },
+                text = { Text("Depo Lotları", fontWeight = FontWeight.SemiBold, fontSize = 12.sp) }
+            )
+            Tab(
+                selected = subTab == 1,
+                onClick = { subTab = 1 },
+                text = { Text("Geri Çağırma (Recall)", fontWeight = FontWeight.SemiBold, fontSize = 12.sp) }
+            )
+        }
+        Box(modifier = Modifier.weight(1f)) {
+            if (subTab == 0) {
+                LotsScreen(viewModel = lotsViewModel)
+            } else {
+                RecallsScreen(viewModel = recallsViewModel)
             }
         }
     }

@@ -28,4 +28,15 @@ interface ListingApiService {
     suspend fun createFarmerListing(
         @Body request: CreateFarmerListingRequest
     ): Response<Map<String, Any>>
+
+    @retrofit2.http.PUT("listings/farmer/{id}")
+    suspend fun updateFarmerListing(
+        @retrofit2.http.Path("id") id: Int,
+        @Body request: Map<String, Any?>
+    ): Response<Map<String, Any>>
+
+    @retrofit2.http.PATCH("listings/farmer/{id}/toggle")
+    suspend fun toggleFarmerListing(
+        @retrofit2.http.Path("id") id: Int
+    ): Response<Map<String, Any>>
 }
