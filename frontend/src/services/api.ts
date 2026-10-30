@@ -110,10 +110,11 @@ export const notificationService = {
 
 // Recalls
 export const recallService = {
-  getAll:    ()               => api.get('/recalls'),
-  getById:   (id: number)     => api.get(`/recalls/${id}`),
-  initiate:  (data: object)   => api.post('/recalls', data),
-  complete:  (id: number)     => api.patch(`/recalls/${id}/complete`),
+  getAll:            ()               => api.get('/recalls'),
+  getById:           (id: number)     => api.get(`/recalls/${id}`),
+  getRecallableLots: ()               => api.get('/recalls/recallable-lots'),
+  initiate:          (data: object)   => api.post('/recalls', data),
+  complete:          (id: number)     => api.patch(`/recalls/${id}/complete`),
 };
 
 // ML

@@ -147,8 +147,8 @@ fun ProducerListingsManageScreen(
         EditProducerListingDialog(
             listing = listing,
             onDismiss = { editingListing = null },
-            onConfirm = { price, minQty, desc ->
-                viewModel.updateProducerListing(listing.id, price, minQty, desc) {
+            onConfirm = { price, currency, minQty, desc ->
+                viewModel.updateProducerListing(listing.id, price, currency, minQty, desc) {
                     editingListing = null
                 }
             }
@@ -231,9 +231,9 @@ fun ProducerListingCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("Fason İşçilik Ücreti", fontSize = 11.sp, color = Color.Gray)
+                    Text("Paket Başı Hizmet Bedeli", fontSize = 11.sp, color = Color.Gray)
                     Text(
-                        String.format(Locale.US, "%.2f € / %s", listing.servicePrice, listing.serviceUnit),
+                        String.format(Locale.US, "%.2f %s / paket", listing.servicePrice, listing.currency ?: "TL"),
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         color = ForestGreen
@@ -243,7 +243,7 @@ fun ProducerListingCard(
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Min. Sipariş", fontSize = 11.sp, color = Color.Gray)
                     Text(
-                        "${listing.minOrderQty ?: 1.0} kg",
+                        "${(listing.minOrderQty ?: 1.0).toInt()} paket",
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp
                     )
@@ -292,11 +292,13 @@ fun ProducerListingCard(
 fun EditProducerListingDialog(
     listing: ProducerListing,
     onDismiss: () -> Unit,
-    onConfirm: (price: Double, minQty: Double?, desc: String?) -> Unit
+    onConfirm: (price: Double, currency: String, minQty: Double?, desc: String?) -> Unit
 ) {
     var priceText by remember { mutableStateOf(listing.servicePrice.toString()) }
-    var minQtyText by remember { mutableStateOf((listing.minOrderQty ?: 1.0).toString()) }
+    var currency by remember { mutableStateOf(listing.currency ?: "TL") }
+    var minQtyText by remember { mutableStateOf((listing.minOrderQty ?: 1.0).toInt().toString()) }
     var descText by remember { mutableStateOf(listing.description ?: "") }
+    val currencyOptions = listOf("TL", "EUR", "USD", "GBP")
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -320,10 +322,24 @@ fun EditProducerListingDialog(
 
                 Text(listing.productName, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
 
+                Text("Para Birimi Seçin:", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    currencyOptions.forEach { curr ->
+                        FilterChip(
+                            selected = currency == curr,
+                            onClick = { currency = curr },
+                            label = { Text(curr, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                        )
+                    }
+                }
+
                 OutlinedTextField(
                     value = priceText,
                     onValueChange = { priceText = it },
-                    label = { Text("Hizmet Ücreti (EUR / ${listing.serviceUnit})") },
+                    label = { Text("Paket Başı Hizmet Bedeli ($currency / paket)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -331,7 +347,7 @@ fun EditProducerListingDialog(
                 OutlinedTextField(
                     value = minQtyText,
                     onValueChange = { minQtyText = it },
-                    label = { Text("Min. Sipariş (kg)") },
+                    label = { Text("Min. Sipariş (paket)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -355,7 +371,7 @@ fun EditProducerListingDialog(
                         onClick = {
                             val p = priceText.toDoubleOrNull() ?: listing.servicePrice
                             val q = minQtyText.toDoubleOrNull()
-                            onConfirm(p, q, descText.ifBlank { null })
+                            onConfirm(p, currency, q, descText.ifBlank { null })
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
                         modifier = Modifier.weight(1.5f)
@@ -500,6 +516,20 @@ fun CreateProducerListingDialog(
                             color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.height(6.dp))
+                        Text("Para Birimi Seçin:", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf("TL", "EUR", "USD", "GBP").forEach { curr ->
+                                FilterChip(
+                                    selected = state.currency == curr,
+                                    onClick = { viewModel.updateCurrency(curr) },
+                                    label = { Text(curr, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -510,7 +540,7 @@ fun CreateProducerListingDialog(
                                     servicePriceText = it
                                     it.toDoubleOrNull()?.let { v -> viewModel.updateServicePrice(v) }
                                 },
-                                label = { Text("İşçilik (€/kg)", fontSize = 12.sp) },
+                                label = { Text("Paket Başı Ücret (${state.currency}/paket)", fontSize = 12.sp) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                 modifier = Modifier.weight(1f),
                                 singleLine = true
@@ -521,7 +551,7 @@ fun CreateProducerListingDialog(
                                     minOrderQtyText = it
                                     it.toDoubleOrNull()?.let { v -> viewModel.updateMinOrderQty(v) }
                                 },
-                                label = { Text("Min. Sipariş (kg)", fontSize = 12.sp) },
+                                label = { Text("Min. Sipariş (paket)", fontSize = 12.sp) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                 modifier = Modifier.weight(1f),
                                 singleLine = true

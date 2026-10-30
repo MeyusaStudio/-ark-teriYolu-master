@@ -36,6 +36,7 @@ data class ProducerListingsUiState(
     val isCreatingListing: Boolean = false,
     val selectedTemplate: ProductTemplate = ProductTemplates.ITEMS[0],
     val servicePrice: Double = 3.50,
+    val currency: String = "TL",
     val minOrderQty: Double = 5.0,
     val listingDescription: String = "Geleneksel fermente Türk sucuğu fason üretimi",
     val ingredientAmounts: Map<String, Double> = mapOf(
@@ -264,6 +265,10 @@ class ProducerListingsViewModel(application: Application) : AndroidViewModel(app
         _uiState.update { it.copy(servicePrice = price) }
     }
 
+    fun updateCurrency(currency: String) {
+        _uiState.update { it.copy(currency = currency) }
+    }
+
     fun updateMinOrderQty(qty: Double) {
         _uiState.update { it.copy(minOrderQty = qty) }
     }
@@ -290,7 +295,8 @@ class ProducerListingsViewModel(application: Application) : AndroidViewModel(app
                     productName = state.selectedTemplate.label,
                     description = state.listingDescription,
                     servicePrice = state.servicePrice,
-                    serviceUnit = "kg",
+                    currency = state.currency,
+                    serviceUnit = "paket",
                     minOrderQty = state.minOrderQty,
                     requiredMaterials = required
                 )
@@ -619,18 +625,21 @@ class ProducerListingsViewModel(application: Application) : AndroidViewModel(app
     fun updateProducerListing(
         id: Int,
         servicePrice: Double,
+        currency: String = "TL",
         minOrderQty: Double?,
         description: String?,
         onSuccess: () -> Unit
     ) {
         viewModelScope.launch {
             try {
-                val body = mapOf(
-                    "service_price" to servicePrice,
-                    "min_order_qty" to (minOrderQty ?: 1.0),
-                    "description" to (description ?: "")
+                val req = UpdateProducerListingRequest(
+                    servicePrice = servicePrice,
+                    currency = currency,
+                    serviceUnit = "paket",
+                    minOrderQty = minOrderQty ?: 1.0,
+                    description = description ?: ""
                 )
-                val resp = apiClient.listingService.updateProducerListing(id, body)
+                val resp = apiClient.listingService.updateProducerListing(id, req)
                 if (resp.isSuccessful) {
                     _uiState.update { it.copy(successMessage = "İlan güncellendi") }
                     loadMyProducerListings()

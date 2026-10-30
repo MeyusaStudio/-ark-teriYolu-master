@@ -43,39 +43,53 @@ router.get('/producer', async (_req, res) => {
 
 // Yeni ilan oluştur
 router.post('/producer', authorize('sucukcu'), async (req: AuthRequest, res) => {
-  const { product_name, description, service_price, service_unit, min_order_qty, required_materials } = req.body;
+  const { product_name, description, service_price, min_order_qty, required_materials, currency } = req.body;
+  const curr = currency ? String(currency).trim().toUpperCase() : 'EUR';
   try {
     const listingId = await insertQuery(
       sequelize,
-      `INSERT INTO producer_listings (producer_id, product_name, description, service_price, service_unit, min_order_qty, required_materials)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [req.user!.id, product_name, description || null, service_price, service_unit, min_order_qty || null, required_materials ? JSON.stringify(required_materials) : null]
+      `INSERT INTO producer_listings (producer_id, product_name, description, service_price, service_unit, min_order_qty, required_materials, currency)
+       VALUES (?, ?, ?, ?, 'paket', ?, ?, ?)`,
+      [req.user!.id, product_name, description || null, service_price, min_order_qty || null, required_materials ? JSON.stringify(required_materials) : null, curr]
     );
     res.status(201).json({ message: 'İlan oluşturuldu', listingId });
-  } catch {
+  } catch (err) {
+    console.error('Producer ilan oluşturma hatası:', err);
     res.status(500).json({ error: 'İlan oluşturulamadı' });
   }
 });
 
 // İlan güncelle
 router.put('/producer/:id', authorize('sucukcu'), async (req: AuthRequest, res) => {
-  const { description, service_price, min_order_qty, required_materials } = req.body;
+  const { description, service_price, servicePrice, min_order_qty, minOrderQty, required_materials, currency } = req.body;
+  const price = service_price !== undefined ? service_price : servicePrice;
+  const minQty = min_order_qty !== undefined ? min_order_qty : minOrderQty;
+  const curr = currency ? String(currency).trim().toUpperCase() : null;
   try {
     await sequelize.query(
       `UPDATE producer_listings
-       SET description = ?, service_price = ?, min_order_qty = ?, required_materials = ?, updated_at = NOW()
+       SET description = COALESCE(?, description),
+           service_price = COALESCE(?, service_price),
+           currency = COALESCE(?, currency),
+           min_order_qty = COALESCE(?, min_order_qty),
+           service_unit = 'paket',
+           required_materials = CASE WHEN ? IS NOT NULL THEN ? ELSE required_materials END,
+           updated_at = NOW()
        WHERE id = ? AND producer_id = ?`,
       { replacements: [
-        description || null,
-        service_price,
-        min_order_qty || null,
+        description !== undefined ? description : null,
+        price !== undefined ? price : null,
+        curr,
+        minQty !== undefined ? minQty : null,
+        required_materials !== undefined ? 'yes' : null,
         required_materials ? JSON.stringify(required_materials) : null,
         req.params.id,
         req.user!.id,
       ]}
     );
     res.json({ message: 'İlan güncellendi' });
-  } catch {
+  } catch (err) {
+    console.error('Producer ilan güncelleme hatası:', err);
     res.status(500).json({ error: 'İlan güncellenemedi' });
   }
 });
@@ -174,8 +188,8 @@ router.post('/farmer', authorize('hayvanci'), async (req: AuthRequest, res) => {
     const listingId = await insertQuery(
       sequelize,
       `INSERT INTO farmer_listings (farmer_id, lot_id, product_name, quantity, unit, unit_price, currency, description)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user!.id, lot_id, product_name, quantity, unit, unit_price, curr, description || null]
+       VALUES (?, ?, ?, ?, 'paket', ?, ?, ?)`,
+      [req.user!.id, lot_id, product_name, quantity, unit_price, curr, description || null]
     );
     res.status(201).json({ message: 'İlan oluşturuldu', listingId });
   } catch {

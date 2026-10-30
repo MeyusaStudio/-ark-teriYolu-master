@@ -174,11 +174,13 @@ export default function ProductionPage() {
     if (!completing || !actualQty || !serviceCost) return;
     setSubmitting(true);
     try {
-      const costInEur = convertToEur(serviceCost, serviceCurrency);
+      const unitCostInEur = convertToEur(serviceCost, serviceCurrency);
+      const totalCostInEur = unitCostInEur * actualQty;
       const { data } = await productionService.complete(completing.id, {
-        actual_qty:      actualQty,
-        service_cost:    costInEur,
-        production_date: productionDate.format('YYYY-MM-DD'),
+        actual_qty:        actualQty,
+        service_cost:      totalCostInEur,
+        unit_service_cost: unitCostInEur,
+        production_date:   productionDate.format('YYYY-MM-DD'),
       });
       setResult(data);
       loadProductions();
@@ -563,7 +565,7 @@ export default function ProductionPage() {
 
               <div>
                 <Text style={{ fontSize: 13, display: 'block', marginBottom: 6 }}>
-                  {t('production.serviceCost')}
+                  Paket Başı Fason Hizmet Bedeli
                 </Text>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <InputNumber
@@ -573,6 +575,7 @@ export default function ProductionPage() {
                     style={{ flex: 1 }}
                     size="large"
                     placeholder="0.00"
+                    addonAfter={`/ ${t('production.packageUnit').toLowerCase()}`}
                   />
                   <CurrencySelect
                     value={serviceCurrency}
@@ -582,9 +585,14 @@ export default function ProductionPage() {
                 </div>
                 <EurEquivalentPreview amount={serviceCost} currency={serviceCurrency} />
                 {serviceCost && actualQty && actualQty > 0 && (
-                  <Text type="secondary" style={{ fontSize: 11, marginTop: 4, display: 'block' }}>
-                    {t('production.servicePerPackage')}: {formatMoney(serviceCost / actualQty, serviceCurrency)} / {t('production.packageUnit').toLowerCase()}
-                  </Text>
+                  <Card size="small" style={{ marginTop: 8, background: '#f6ffed', border: '1px solid #b7eb8f' }}>
+                    <Text strong style={{ color: '#52c41a' }}>
+                      Toplam Fason Hizmet Bedeli: {formatMoney(serviceCost * actualQty, serviceCurrency, true)}
+                    </Text>
+                    <div style={{ fontSize: 11, color: '#8c8c8c' }}>
+                      ({actualQty} paket × {formatMoney(serviceCost, serviceCurrency)})
+                    </div>
+                  </Card>
                 )}
               </div>
 

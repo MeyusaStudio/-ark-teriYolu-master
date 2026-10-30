@@ -25,7 +25,7 @@ data class ProductionUiState(
     // Complete / Onay Dialog
     val selectedForComplete: ProductionOrder? = null,
     val actualQty: Double = 4.0,
-    val serviceCost: Double = 14.00,
+    val unitServiceCost: Double = 3.50,
     val productionDate: String = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()),
     val orderInputKg: Double = 4.30,
     val totalRawCost: Double = 0.0,
@@ -37,6 +37,9 @@ data class ProductionUiState(
     val selectedDetail: ProductionOrder? = null,
     val isLoadingDetail: Boolean = false
 ) {
+    val totalServiceCost: Double
+        get() = actualQty * unitServiceCost
+
     val netPackagedKg: Double
         get() = actualQty * 1.0 // 1.00 kg/paket
 
@@ -50,7 +53,7 @@ data class ProductionUiState(
         get() = if (totalRawCost > 0) totalRawCost else (selectedForComplete?.totalRawCost ?: 0.0)
 
     val estimatedEkp: Double
-        get() = if (actualQty > 0) (effectiveRawCost + serviceCost) / actualQty else 0.0
+        get() = if (actualQty > 0) (effectiveRawCost + totalServiceCost) / actualQty else 0.0
 }
 
 class ProductionViewModel(application: Application) : AndroidViewModel(application) {
@@ -91,12 +94,12 @@ class ProductionViewModel(application: Application) : AndroidViewModel(applicati
 
     fun openCompleteDialog(order: ProductionOrder) {
         val defaultQty = if (order.expectedQty > 0) order.expectedQty else 4.0
-        val defaultServiceCost = if (order.expectedQty > 0) (order.expectedQty * 3.50) else 14.00
+        val defaultUnitCost = 3.50
         _uiState.update {
             it.copy(
                 selectedForComplete = order,
                 actualQty = defaultQty,
-                serviceCost = defaultServiceCost,
+                unitServiceCost = defaultUnitCost,
                 orderInputKg = defaultQty * 1.075, // geçici varsayılan, API detayı güncelleyecek
                 totalRawCost = 0.0,
                 detailRawMaterials = emptyList(),
@@ -132,11 +135,11 @@ class ProductionViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun updateCompleteForm(actualQty: Double? = null, serviceCost: Double? = null) {
+    fun updateCompleteForm(actualQty: Double? = null, unitServiceCost: Double? = null) {
         _uiState.update {
             it.copy(
                 actualQty = actualQty ?: it.actualQty,
-                serviceCost = serviceCost ?: it.serviceCost
+                unitServiceCost = unitServiceCost ?: it.unitServiceCost
             )
         }
     }
@@ -146,9 +149,9 @@ class ProductionViewModel(application: Application) : AndroidViewModel(applicati
         _uiState.update {
             it.copy(
                 actualQty = 4.0,
-                serviceCost = 15.00,
+                unitServiceCost = 3.75,
                 orderInputKg = 4.30,
-                successMessage = "Görev 1 Standart Senaryosu: 4.30 kg Girdi ➔ 4.00 kg Net Mamul (0.30 kg / %6.98 Fire)!"
+                successMessage = "Görev 1 Standart Senaryosu: 4.30 kg Girdi ➔ 4 Paket Mamul (0.30 kg / %6.98 Fire)!"
             )
         }
     }
@@ -167,7 +170,8 @@ class ProductionViewModel(application: Application) : AndroidViewModel(applicati
             try {
                 val req = CompleteProductionRequest(
                     actualQty = state.actualQty,
-                    serviceCost = state.serviceCost,
+                    serviceCost = state.totalServiceCost,
+                    unitServiceCost = state.unitServiceCost,
                     productionDate = state.productionDate
                 )
                 val resp = apiClient.productionService.completeProduction(order.id, req)

@@ -23,11 +23,13 @@ import com.avatar.app.ui.theme.ForestGreen
 fun EditFarmerListingDialog(
     listing: FarmerListing,
     onDismiss: () -> Unit,
-    onConfirm: (price: Double, qty: Double, description: String?) -> Unit
+    onConfirm: (price: Double, currency: String, qty: Double, description: String?) -> Unit
 ) {
     var priceText by remember { mutableStateOf(listing.unitPrice.toString()) }
-    var qtyText by remember { mutableStateOf(listing.quantity.toString()) }
+    var currency by remember { mutableStateOf(listing.currency ?: "TL") }
+    var qtyText by remember { mutableStateOf(listing.quantity.toInt().toString()) }
     var description by remember { mutableStateOf(listing.description ?: "") }
+    val currencyOptions = listOf("TL", "EUR", "USD", "GBP")
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -56,10 +58,24 @@ fun EditFarmerListingDialog(
                 Text(listing.productName, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 Text("Lot No: ${listing.lotNumber}", fontSize = 12.sp, color = Color.Gray)
 
+                Text("Para Birimi Seçin:", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    currencyOptions.forEach { curr ->
+                        FilterChip(
+                            selected = currency == curr,
+                            onClick = { currency = curr },
+                            label = { Text(curr, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                        )
+                    }
+                }
+
                 OutlinedTextField(
                     value = priceText,
                     onValueChange = { priceText = it },
-                    label = { Text("Birim Fiyat (${listing.currency ?: "EUR"})") },
+                    label = { Text("Birim Fiyat ($currency / paket)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -67,7 +83,7 @@ fun EditFarmerListingDialog(
                 OutlinedTextField(
                     value = qtyText,
                     onValueChange = { qtyText = it },
-                    label = { Text("Miktar (${listing.unit})") },
+                    label = { Text("Miktar (paket)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -91,7 +107,7 @@ fun EditFarmerListingDialog(
                         onClick = {
                             val p = priceText.toDoubleOrNull() ?: listing.unitPrice
                             val q = qtyText.toDoubleOrNull() ?: listing.quantity
-                            onConfirm(p, q, description.ifBlank { null })
+                            onConfirm(p, currency, q, description.ifBlank { null })
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
                         modifier = Modifier.weight(1.5f)

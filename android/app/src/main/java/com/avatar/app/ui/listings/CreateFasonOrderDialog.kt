@@ -144,9 +144,9 @@ fun CreateFasonOrderDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column {
-                                    Text("Fason İşçilik Ücreti", fontSize = 11.sp, color = Color.Gray)
+                                    Text("Paket Başı Hizmet Bedeli", fontSize = 11.sp, color = Color.Gray)
                                     Text(
-                                        String.format(Locale.US, "%.2f € / kg", listing.servicePrice),
+                                        String.format(Locale.US, "%.2f %s / paket", listing.servicePrice, listing.currency ?: "TL"),
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 15.sp,
                                         color = PrimaryBlue
@@ -154,7 +154,7 @@ fun CreateFasonOrderDialog(
                                 }
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text("Min. Sipariş", fontSize = 11.sp, color = Color.Gray)
-                                    Text("${listing.minOrderQty ?: 1.0} kg", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text("${(listing.minOrderQty ?: 1.0).toInt()} paket", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 }
                             }
                         }

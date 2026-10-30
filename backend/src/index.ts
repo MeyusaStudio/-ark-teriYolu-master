@@ -157,6 +157,12 @@ async function bootstrap() {
       }
     }
 
+    try {
+      await sequelize.query("ALTER TABLE market_purchases MODIFY COLUMN status ENUM('beklemede','onaylandi','sevk_edildi','teslim_alindi','geri_cagrildi') NOT NULL DEFAULT 'beklemede'");
+    } catch {
+      // Yoksay
+    }
+
     // Admin Rolü ve Ban Kolonları Senkronizasyonu
     try {
       await sequelize.query("ALTER TABLE users MODIFY COLUMN role ENUM('hayvanci','sucukcu','market','admin') NOT NULL");

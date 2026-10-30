@@ -117,7 +117,7 @@ export default function FarmerListingsPage() {
       form.setFieldsValue({
         product_name: lot.lot_number,
         quantity:     Number(lot.quantity),
-        unit:         lot.unit,
+        unit:         'paket',
         unit_price:   lot.unit_cost > 0 ? Number(lot.unit_cost) : undefined,
         currency:     (lot as any).currency || 'EUR',
       });
@@ -129,14 +129,17 @@ export default function FarmerListingsPage() {
     lot_id: number;
     product_name: string;
     quantity: number;
-    unit: string;
+    unit?: string;
     unit_price: number;
     currency?: string;
     description?: string;
   }) {
     setCreating(true);
     try {
-      await listingService.createFarmerListing(values);
+      await listingService.createFarmerListing({
+        ...values,
+        unit: 'paket',
+      });
       message.success('İlan oluşturuldu');
       setCreateOpen(false);
       setSelectedLot(null);
@@ -369,26 +372,16 @@ export default function FarmerListingsPage() {
           </Form.Item>
 
           <Row gutter={12}>
-            <Col span={10}>
+            <Col span={14}>
               <Form.Item
-                name="quantity" label={t('listings.quantity')}
+                name="quantity" label={`${t('listings.quantity')} (Paket)`}
                 rules={[{ required: true, message: t('rawMaterials.enterQuantity') }]}
               >
-                <InputNumber min={0.001} step={0.1} precision={3} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item name="unit" label={t('common.unit')} rules={[{ required: true }]}>
-                <Select>
-                  <Select.Option value="kg">kg</Select.Option>
-                  <Select.Option value="paket">{t('production.packageUnit')}</Select.Option>
-                  <Select.Option value="adet">adet</Select.Option>
-                  <Select.Option value="lt">lt</Select.Option>
-                </Select>
+                <InputNumber min={1} step={1} precision={0} style={{ width: '100%' }} addonAfter="paket" />
               </Form.Item>
             </Col>
             <Col span={10}>
-              <Form.Item label={t('common.unitPrice')} required>
+              <Form.Item label={`${t('common.unitPrice')} (/paket)`} required>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <Form.Item
                     name="unit_price"

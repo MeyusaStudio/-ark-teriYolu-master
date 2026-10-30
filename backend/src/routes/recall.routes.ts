@@ -5,12 +5,14 @@ import {
   getRecalls,
   getRecallById,
   completeRecall,
+  getRecallableLots,
 } from '../controllers/recall.controller';
 
 const router = Router();
 
 router.use(authenticate);
 
+router.get('/recallable-lots', getRecallableLots);
 router.get('/',     getRecalls);
 router.get('/:id',  getRecallById);
 router.post('/',    authorize('hayvanci', 'sucukcu'), initiateRecall);

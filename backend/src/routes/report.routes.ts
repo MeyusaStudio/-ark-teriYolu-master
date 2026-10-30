@@ -10,15 +10,36 @@ router.use(authenticate);
 // ── 1. ÖZET KPI VE DASHBOARD RAPORU ───────────────────────────────────────────
 router.get('/summary', async (req: AuthRequest, res) => {
   try {
+    const role = req.user!.role;
+    const userId = req.user!.id;
+
     // Hammadde toplamı
+    let rawCondition = '1=1';
+    let rawParams: any[] = [];
+    if (role === 'hayvanci') {
+      rawCondition = 'owner_id = ?';
+      rawParams = [userId];
+    } else if (role !== 'admin') {
+      rawCondition = '1=0';
+    }
+
     const rawSummary = await selectQuery<{ total_cost: string; total_items: number }>(
       sequelize,
       `SELECT COALESCE(SUM(total_cost), 0) as total_cost, COUNT(*) as total_items
-       FROM raw_materials`,
-      []
+       FROM raw_materials WHERE ${rawCondition}`,
+      rawParams
     );
 
     // Parçalama özeti
+    let butcheryCondition = '1=1';
+    let butcheryParams: any[] = [];
+    if (role === 'hayvanci') {
+      butcheryCondition = 'operator_id = ?';
+      butcheryParams = [userId];
+    } else if (role !== 'admin') {
+      butcheryCondition = '1=0';
+    }
+
     const butcherySummary = await selectQuery<{
       op_count: number;
       total_input: string;
@@ -33,11 +54,23 @@ router.get('/summary', async (req: AuthRequest, res) => {
          COALESCE(SUM(total_output_kg), 0) as total_output,
          COALESCE(SUM(waste_kg), 0) as total_waste,
          COALESCE(SUM(total_cost), 0) as total_cost
-       FROM butchery_operations`,
-      []
+       FROM butchery_operations WHERE ${butcheryCondition}`,
+      butcheryParams
     );
 
     // Üretim ve EKP özeti
+    let prodCondition = '1=1';
+    let prodParams: any[] = [];
+    if (role === 'sucukcu') {
+      prodCondition = 'po.producer_id = ?';
+      prodParams = [userId];
+    } else if (role === 'hayvanci') {
+      prodCondition = 'o.buyer_id = ?';
+      prodParams = [userId];
+    } else if (role !== 'admin') {
+      prodCondition = '1=0';
+    }
+
     const prodSummary = await selectQuery<{
       total_orders: number;
       completed_orders: number;
@@ -49,17 +82,30 @@ router.get('/summary', async (req: AuthRequest, res) => {
       sequelize,
       `SELECT
          COUNT(*) as total_orders,
-         SUM(CASE WHEN status = 'tamamlandi' OR status = 'sevk_edildi' THEN 1 ELSE 0 END) as completed_orders,
-         COALESCE(SUM(actual_qty), 0) as total_output_qty,
-         COALESCE(SUM(service_cost), 0) as total_service_cost,
-         COALESCE(SUM(total_raw_cost), 0) as total_raw_cost,
-         COALESCE(AVG(ekp), 0) as avg_ekp
-       FROM production_orders
-       WHERE actual_qty IS NOT NULL`,
-      []
+         SUM(CASE WHEN po.status = 'tamamlandi' OR po.status = 'sevk_edildi' THEN 1 ELSE 0 END) as completed_orders,
+         COALESCE(SUM(po.actual_qty), 0) as total_output_qty,
+         COALESCE(SUM(po.service_cost), 0) as total_service_cost,
+         COALESCE(SUM(po.total_raw_cost), 0) as total_raw_cost,
+         COALESCE(AVG(po.ekp), 0) as avg_ekp
+       FROM production_orders po
+       JOIN orders o ON po.order_id = o.id
+       WHERE po.actual_qty IS NOT NULL AND ${prodCondition}`,
+      prodParams
     );
 
     // Satış ve Ciro özeti
+    let salesCondition = '1=1';
+    let salesParams: any[] = [];
+    if (role === 'hayvanci') {
+      salesCondition = 'farmer_id = ?';
+      salesParams = [userId];
+    } else if (role === 'market') {
+      salesCondition = 'market_id = ?';
+      salesParams = [userId];
+    } else if (role !== 'admin') {
+      salesCondition = '1=0';
+    }
+
     const salesSummary = await selectQuery<{
       sale_count: number;
       total_revenue: string;
@@ -70,11 +116,21 @@ router.get('/summary', async (req: AuthRequest, res) => {
          COUNT(*) as sale_count,
          COALESCE(SUM(total_price), 0) as total_revenue,
          COALESCE(SUM(quantity), 0) as total_sold_qty
-       FROM market_purchases`,
-      []
+       FROM market_purchases WHERE ${salesCondition}`,
+      salesParams
     );
 
     // Lot ve Geri Çağırma özeti
+    let lotCondition = '1=1';
+    let lotParams: any[] = [];
+    if (role === 'hayvanci' || role === 'sucukcu') {
+      lotCondition = 'owner_id = ?';
+      lotParams = [userId];
+    } else if (role === 'market') {
+      lotCondition = 'id IN (SELECT lot_id FROM market_purchases WHERE market_id = ?)';
+      lotParams = [userId];
+    }
+
     const lotSummary = await selectQuery<{
       total_lots: number;
       active_lots: number;
@@ -85,8 +141,8 @@ router.get('/summary', async (req: AuthRequest, res) => {
          COUNT(*) as total_lots,
          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_lots,
          SUM(CASE WHEN status = 'recalled' OR status = 'blocked' THEN 1 ELSE 0 END) as recalled_lots
-       FROM lots`,
-      []
+       FROM lots WHERE ${lotCondition}`,
+      lotParams
     );
 
     const inputKg  = parseFloat(butcherySummary[0]?.total_input || '0');
@@ -131,7 +187,8 @@ router.get('/summary', async (req: AuthRequest, res) => {
         recalledLots: Number(lotSummary[0]?.recalled_lots || 0),
       },
     });
-  } catch {
+  } catch (err) {
+    console.error('Özet rapor hatası:', err);
     res.status(500).json({ error: 'Özet rapor alınamadı' });
   }
 });
@@ -139,6 +196,21 @@ router.get('/summary', async (req: AuthRequest, res) => {
 // ── 2. HAMMADDE VE ALIŞ RAPORU ───────────────────────────────────────────────
 router.get('/purchases', async (req: AuthRequest, res) => {
   try {
+    const role = req.user!.role;
+    const userId = req.user!.id;
+
+    if (role === 'market' || role === 'sucukcu') {
+      res.json([]);
+      return;
+    }
+
+    let whereClause = '1=1';
+    let params: any[] = [];
+    if (role === 'hayvanci') {
+      whereClause = 'rm.owner_id = ?';
+      params = [userId];
+    }
+
     const rows = await selectQuery(
       sequelize,
       `SELECT
@@ -156,8 +228,9 @@ router.get('/purchases', async (req: AuthRequest, res) => {
        FROM raw_materials rm
        JOIN lots l ON rm.lot_id = l.id
        JOIN users u ON rm.owner_id = u.id
+       WHERE ${whereClause}
        ORDER BY rm.created_at DESC`,
-      []
+      params
     );
     res.json(rows);
   } catch {
@@ -168,6 +241,21 @@ router.get('/purchases', async (req: AuthRequest, res) => {
 // ── 3. PARÇALAMA VE FİRE DENGE RAPORU (SAPMA HESAPLI) ────────────────────────
 router.get('/butchery', async (req: AuthRequest, res) => {
   try {
+    const role = req.user!.role;
+    const userId = req.user!.id;
+
+    if (role === 'sucukcu' || role === 'market') {
+      res.json([]);
+      return;
+    }
+
+    let whereClause = '1=1';
+    let params: any[] = [];
+    if (role === 'hayvanci') {
+      whereClause = 'bo.operator_id = ?';
+      params = [userId];
+    }
+
     const operations = await selectQuery<{
       id: number;
       operator_name: string;
@@ -194,11 +282,11 @@ router.get('/butchery', async (req: AuthRequest, res) => {
          bo.created_at
        FROM butchery_operations bo
        JOIN users u ON bo.operator_id = u.id
+       WHERE ${whereClause}
        ORDER BY bo.operation_date DESC, bo.id DESC`,
-      []
+      params
     );
 
-    // Her operasyon için parçaları getir
     const opIds = operations.map(o => o.id);
     let parts: Array<{
       id: number;
@@ -253,9 +341,27 @@ router.get('/butchery', async (req: AuthRequest, res) => {
   }
 });
 
-// ── 4. ÜRETİM VE EKP MALİYET RAPORU (TAHMİN VS GERÇEK SAPMA DAHİL) ───────────
+// ── 4. ÜRETİM VE EKP MALİYET RAPORU ───────────────────────────
 router.get('/production', async (req: AuthRequest, res) => {
   try {
+    const role = req.user!.role;
+    const userId = req.user!.id;
+
+    if (role === 'market') {
+      res.json([]);
+      return;
+    }
+
+    let whereClause = '1=1';
+    let params: any[] = [];
+    if (role === 'sucukcu') {
+      whereClause = 'po.producer_id = ?';
+      params = [userId];
+    } else if (role === 'hayvanci') {
+      whereClause = 'o.buyer_id = ?';
+      params = [userId];
+    }
+
     const rows = await selectQuery(
       sequelize,
       `SELECT
@@ -286,8 +392,9 @@ router.get('/production', async (req: AuthRequest, res) => {
        JOIN orders o ON po.order_id = o.id
        JOIN users pu ON po.producer_id = pu.id
        JOIN users bu ON o.buyer_id = bu.id
+       WHERE ${whereClause}
        ORDER BY po.created_at DESC`,
-      []
+      params
     );
     res.json(rows);
   } catch {
@@ -298,6 +405,22 @@ router.get('/production', async (req: AuthRequest, res) => {
 // ── 5. TÜM LOT HAREKETLERİ DENETİM RAPORU (AUDIT TRAIL) ──────────────────────
 router.get('/lot-movements', async (req: AuthRequest, res) => {
   try {
+    const role = req.user!.role;
+    const userId = req.user!.id;
+
+    let whereClause = '1=1';
+    let params: any[] = [];
+    if (role === 'hayvanci') {
+      whereClause = '(l.owner_id = ? OR lm.from_user_id = ? OR lm.to_user_id = ?)';
+      params = [userId, userId, userId];
+    } else if (role === 'sucukcu') {
+      whereClause = '(lm.from_user_id = ? OR lm.to_user_id = ? OR l.owner_id = ?)';
+      params = [userId, userId, userId];
+    } else if (role === 'market') {
+      whereClause = '(lm.to_user_id = ? OR l.owner_id = ?)';
+      params = [userId, userId];
+    }
+
     const rows = await selectQuery(
       sequelize,
       `SELECT
@@ -318,9 +441,10 @@ router.get('/lot-movements', async (req: AuthRequest, res) => {
        JOIN lots l ON lm.lot_id = l.id
        LEFT JOIN users fu ON lm.from_user_id = fu.id
        LEFT JOIN users tu ON lm.to_user_id = tu.id
+       WHERE ${whereClause}
        ORDER BY lm.created_at DESC
        LIMIT 500`,
-      []
+      params
     );
     res.json(rows);
   } catch {
@@ -331,6 +455,25 @@ router.get('/lot-movements', async (req: AuthRequest, res) => {
 // ── 6. SATIŞ VE CİRO RAPORU ──────────────────────────────────────────────────
 router.get('/sales', async (req: AuthRequest, res) => {
   try {
+    const role = req.user!.role;
+    const userId = req.user!.id;
+
+    if (role === 'sucukcu') {
+      // Sucukçu market satışlarını görmemeli
+      res.json([]);
+      return;
+    }
+
+    let whereClause = '1=1';
+    let params: any[] = [];
+    if (role === 'hayvanci') {
+      whereClause = 'mp.farmer_id = ?';
+      params = [userId];
+    } else if (role === 'market') {
+      whereClause = 'mp.market_id = ?';
+      params = [userId];
+    }
+
     const rows = await selectQuery(
       sequelize,
       `SELECT
@@ -354,8 +497,9 @@ router.get('/sales', async (req: AuthRequest, res) => {
        JOIN users fu ON mp.farmer_id = fu.id
        JOIN lots l ON mp.lot_id = l.id
        LEFT JOIN farmer_listings fl ON mp.listing_id = fl.id
+       WHERE ${whereClause}
        ORDER BY mp.purchase_date DESC`,
-      []
+      params
     );
     res.json(rows);
   } catch {
@@ -366,6 +510,22 @@ router.get('/sales', async (req: AuthRequest, res) => {
 // ── 7. GERİ ÇAĞIRMA (RECALL) RAPORU ──────────────────────────────────────────
 router.get('/recalls', async (req: AuthRequest, res) => {
   try {
+    const role = req.user!.role;
+    const userId = req.user!.id;
+
+    let whereClause = '1=1';
+    let params: any[] = [];
+    if (role === 'hayvanci') {
+      whereClause = '(r.initiated_by = ? OR l.owner_id = ?)';
+      params = [userId, userId];
+    } else if (role === 'market') {
+      whereClause = 'EXISTS (SELECT 1 FROM recall_affected_markets ram WHERE ram.recall_id = r.id AND ram.market_id = ?)';
+      params = [userId];
+    } else if (role === 'sucukcu') {
+      whereClause = '(r.initiated_by = ? OR l.owner_id = ?)';
+      params = [userId, userId];
+    }
+
     const recalls = await selectQuery<{
       id: number;
       lot_id: number;
@@ -389,8 +549,9 @@ router.get('/recalls', async (req: AuthRequest, res) => {
        FROM recalls r
        JOIN lots l ON r.lot_id = l.id
        JOIN users u ON r.initiated_by = u.id
+       WHERE ${whereClause}
        ORDER BY r.created_at DESC`,
-      []
+      params
     );
 
     const recallIds = recalls.map(r => r.id);

@@ -14,16 +14,24 @@ export async function initiateRecall(req: AuthRequest, res: Response): Promise<v
 
   const t = await sequelize.transaction();
   try {
-    const lots = await selectQuery<{ id: number; quantity: number; unit: string; owner_id: number; status: string }>(
+    const lots = await selectQuery<{ id: number; quantity: number; unit: string; owner_id: number; status: string; lot_type: string }>(
       sequelize,
-      'SELECT * FROM lots WHERE id = ? AND owner_id = ?',
-      [lotId, req.user!.id],
+      `SELECT DISTINCT l.* FROM lots l
+       LEFT JOIN market_purchases mp ON l.id = mp.lot_id
+       WHERE l.id = ? AND (l.owner_id = ? OR mp.farmer_id = ?)`,
+      [lotId, req.user!.id, req.user!.id],
       t
     );
 
     if (lots.length === 0) {
       await t.rollback();
       res.status(404).json({ error: 'Lot bulunamadı veya yetkiniz yok' });
+      return;
+    }
+
+    if (lots[0].lot_type !== 'mamul') {
+      await t.rollback();
+      res.status(400).json({ error: 'Yalnızca marketlere satılan mamul ürünler geri çağrılabilir.' });
       return;
     }
 
@@ -45,26 +53,26 @@ export async function initiateRecall(req: AuthRequest, res: Response): Promise<v
       return;
     }
 
-    const recallId = await insertQuery(
-      sequelize,
-      "INSERT INTO recalls (initiated_by, lot_id, reason, status) VALUES (?, ?, ?, 'aktif')",
-      [req.user!.id, lotId, reason],
-      t
-    );
-
-    // Hem doğrudan bu lotun satışlarını hem de bu hammadde lotundan üretilen mamul lotlarının satışlarını bul
+    // Market satışlarını bul (Sadece marketlere satılan mamuller geri çağrılabilir)
     const purchases = await selectQuery<{ id: number; market_id: number; quantity: number; unit: string; lot_id: number }>(
       sequelize,
       `SELECT DISTINCT mp.id, mp.market_id, mp.quantity, mp.unit, mp.lot_id
        FROM market_purchases mp
-       WHERE mp.lot_id = ?
-          OR mp.lot_id IN (
-            SELECT pfl.lot_id
-            FROM production_finished_lots pfl
-            JOIN production_raw_materials prm ON pfl.production_order_id = prm.production_order_id
-            WHERE prm.lot_id = ?
-          )`,
-      [lotId, lotId],
+       WHERE mp.lot_id = ?`,
+      [lotId],
+      t
+    );
+
+    if (purchases.length === 0) {
+      await t.rollback();
+      res.status(400).json({ error: 'Bu mamul için market satışı bulunmadığından geri çağırma yapılamaz.' });
+      return;
+    }
+
+    const recallId = await insertQuery(
+      sequelize,
+      "INSERT INTO recalls (initiated_by, lot_id, reason, status) VALUES (?, ?, ?, 'aktif')",
+      [req.user!.id, lotId, reason],
       t
     );
 
@@ -87,7 +95,7 @@ export async function initiateRecall(req: AuthRequest, res: Response): Promise<v
       );
     }
 
-    // Bu lota ait TÜM market satışlarının durumunu 'geri_cagrildi' yap (tek şikayetle tüm market satışları geri çağrılır)
+    // Bu lota ait TÜM market satışlarının durumunu 'geri_cagrildi' yap
     const purchaseIds = purchases.map(p => p.id);
     if (purchaseIds.length > 0) {
       await sequelize.query(
@@ -102,38 +110,24 @@ export async function initiateRecall(req: AuthRequest, res: Response): Promise<v
       { replacements: [lotId], transaction: t }
     );
 
-    // Etkilenen mamul lotlarını da bul ve bloke/recalled yap
-    const affectedFinishedLots = await selectQuery<{ lot_id: number }>(
-      sequelize,
-      `SELECT DISTINCT pfl.lot_id
-       FROM production_finished_lots pfl
-       JOIN production_raw_materials prm ON pfl.production_order_id = prm.production_order_id
-       WHERE prm.lot_id = ?`,
-      [lotId],
-      t
+    // Lotu ve satıştaki ilanını derhal bloke/recalled yap
+    await sequelize.query(
+      "UPDATE lots SET status = 'recalled' WHERE id = ?",
+      { replacements: [lotId], transaction: t }
     );
 
-    const allAffectedLotIds = [Number(lotId), ...affectedFinishedLots.map(f => f.lot_id)];
+    await sequelize.query(
+      'UPDATE farmer_listings SET is_active = 0 WHERE lot_id = ?',
+      { replacements: [lotId], transaction: t }
+    );
 
-    for (const affectedLotId of allAffectedLotIds) {
-      await sequelize.query(
-        "UPDATE lots SET status = 'recalled' WHERE id = ?",
-        { replacements: [affectedLotId], transaction: t }
-      );
-
-      await sequelize.query(
-        'UPDATE farmer_listings SET is_active = 0 WHERE lot_id = ?',
-        { replacements: [affectedLotId], transaction: t }
-      );
-
-      await insertQuery(
-        sequelize,
-        `INSERT INTO lot_movements (lot_id, movement_type, quantity, unit, reference_type, reference_id, from_user_id, notes)
-         SELECT id, 'bloke', quantity, unit, 'recall', ?, owner_id, ? FROM lots WHERE id = ?`,
-        [recallId, reason, affectedLotId],
-        t
-      );
-    }
+    await insertQuery(
+      sequelize,
+      `INSERT INTO lot_movements (lot_id, movement_type, quantity, unit, reference_type, reference_id, from_user_id, notes)
+       SELECT id, 'bloke', quantity, unit, 'recall', ?, owner_id, ? FROM lots WHERE id = ?`,
+      [recallId, reason, lotId],
+      t
+    );
 
     await sequelize.query(
       'UPDATE recalls SET affected_count = ? WHERE id = ?',
@@ -148,9 +142,36 @@ export async function initiateRecall(req: AuthRequest, res: Response): Promise<v
       affectedMarkets: purchases.length,
       lotBlocked: true,
     });
-  } catch {
+  } catch (err) {
+    console.error('Geri çağırma başlatılırken hata:', err);
     await t.rollback();
     res.status(500).json({ error: 'Geri çağırma başlatılamadı' });
+  }
+}
+
+export async function getRecallableLots(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const lots = await selectQuery(
+      sequelize,
+      `SELECT DISTINCT l.id, l.lot_number, l.lot_type, l.quantity, l.unit, l.status,
+              COALESCE(fl.product_name, pfl_po.product_name, l.product_name, 'Mamul Ürün') as product_name,
+              COUNT(mp.id) as market_sale_count
+       FROM lots l
+       JOIN market_purchases mp ON l.id = mp.lot_id
+       LEFT JOIN farmer_listings fl ON mp.listing_id = fl.id
+       LEFT JOIN production_finished_lots pfl ON l.id = pfl.lot_id
+       LEFT JOIN production_orders pfl_po ON pfl.production_order_id = pfl_po.id
+       WHERE (l.owner_id = ? OR mp.farmer_id = ?)
+         AND l.lot_type = 'mamul'
+         AND l.status != 'recalled'
+       GROUP BY l.id, l.lot_number, l.lot_type, l.quantity, l.unit, l.status, product_name
+       ORDER BY l.id DESC`,
+      [req.user!.id, req.user!.id]
+    );
+    res.json(lots);
+  } catch (err) {
+    console.error('Geri çağrılabilir lotlar alınamadı:', err);
+    res.status(500).json({ error: 'Geri çağrılabilir lotlar alınamadı' });
   }
 }
 

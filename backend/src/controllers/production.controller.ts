@@ -5,10 +5,25 @@ import { generateLotNumber } from '../utils/lotNumberGenerator';
 import { insertQuery, selectQuery } from '../utils/dbHelpers';
 
 export async function completeProduction(req: AuthRequest, res: Response): Promise<void> {
-  const { actual_qty, service_cost, production_date } = req.body;
+  const { actual_qty, service_cost, unit_service_cost, production_date } = req.body;
 
-  if (!actual_qty || !service_cost) {
-    res.status(400).json({ error: 'actual_qty ve service_cost zorunludur' });
+  const actualPackages = parseInt(String(actual_qty), 10) || Math.floor(Number(actual_qty));
+  if (!actualPackages || actualPackages <= 0) {
+    res.status(400).json({ error: 'actual_qty (üretilen paket adedi) zorunludur' });
+    return;
+  }
+
+  // Fason hizmet bedeli: Tek paketin bedeli üzerinden toplam hesaplanır
+  const unitServicePrice = unit_service_cost !== undefined && unit_service_cost !== null
+    ? parseFloat(String(unit_service_cost))
+    : (service_cost !== undefined && service_cost !== null ? parseFloat(String(service_cost)) / actualPackages : 0);
+
+  const totalServiceCost = service_cost !== undefined && service_cost !== null && !unit_service_cost
+    ? parseFloat(String(service_cost))
+    : unitServicePrice * actualPackages;
+
+  if (totalServiceCost <= 0 && unitServicePrice <= 0) {
+    res.status(400).json({ error: 'Fason hizmet bedeli zorunludur' });
     return;
   }
 
@@ -40,12 +55,11 @@ export async function completeProduction(req: AuthRequest, res: Response): Promi
     const totalInputKg = parseFloat(rawMaterialsSum[0]?.total_kg || '0');
     const totalRawCost = parseFloat(rawMaterialsSum[0]?.total_cost || '0');
     const packageWeight = 1.00; // Standart 1.00 kg/paket
-    const actualPackages = parseInt(String(actual_qty), 10) || Math.floor(Number(actual_qty));
     const netPackagedKg = actualPackages * packageWeight;
     const fireQty = Math.max(0, parseFloat((totalInputKg - netPackagedKg).toFixed(3)));
     const fireRate = totalInputKg > 0 ? parseFloat(((fireQty / totalInputKg) * 100).toFixed(2)) : 0.00;
 
-    const totalCost = totalRawCost + parseFloat(String(service_cost));
+    const totalCost = totalRawCost + totalServiceCost;
     const ekp = actualPackages > 0 ? totalCost / actualPackages : 0;
 
     await sequelize.query(
@@ -54,7 +68,7 @@ export async function completeProduction(req: AuthRequest, res: Response): Promi
            service_cost = ?, total_raw_cost = ?, ekp = ?,
            status = 'tamamlandi', production_date = ?
        WHERE id = ?`,
-      { replacements: [actualPackages, packageWeight, totalInputKg, fireQty, fireRate, service_cost, totalRawCost, ekp, production_date || new Date(), req.params.id], transaction: t }
+      { replacements: [actualPackages, packageWeight, totalInputKg, fireQty, fireRate, totalServiceCost, totalRawCost, ekp, production_date || new Date(), req.params.id], transaction: t }
     );
 
     const countRows = await selectQuery<{ cnt: number }>(
@@ -99,7 +113,7 @@ export async function completeProduction(req: AuthRequest, res: Response): Promi
     );
     const invSeq = (invCount[0]?.cnt || 0) + 1;
     const invoiceNumber = `FTR-HZM-${new Date().getFullYear()}-${String(invSeq).padStart(3, '0')}`;
-    const unitServiceCost = actualPackages > 0 ? parseFloat((Number(service_cost) / actualPackages).toFixed(4)) : Number(service_cost);
+    const unitServiceCost = unitServicePrice;
 
     await sequelize.query(
       `INSERT INTO invoices 
@@ -117,8 +131,8 @@ export async function completeProduction(req: AuthRequest, res: Response): Promi
           productionOrder.product_name,
           actualPackages,
           unitServiceCost,
-          service_cost,
-          service_cost,
+          totalServiceCost,
+          totalServiceCost,
           production_date || new Date(),
           productionOrder.order_id
         ],

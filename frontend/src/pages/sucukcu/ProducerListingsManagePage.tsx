@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import { listingService } from '../../services/api';
 import { useTranslation } from '../../i18n';
+import { CurrencySelect } from '../../utils/currency';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -94,6 +95,7 @@ interface Listing {
   description?: string;
   service_price: number;
   service_unit: string;
+  currency?: string;
   min_order_qty?: number;
   required_materials?: string;
   is_active: boolean;
@@ -150,6 +152,7 @@ export default function ProducerListingsManagePage() {
 
   async function onSubmit(values: {
     service_price: number;
+    currency?: string;
     min_order_qty?: number;
     description?: string;
   }) {
@@ -166,7 +169,8 @@ export default function ProducerListingsManagePage() {
         product_name:       selectedProduct.label,
         description:        values.description || `${selectedProduct.label} üretimi`,
         service_price:      values.service_price,
-        service_unit:       'kg',
+        service_unit:       'paket',
+        currency:           values.currency || 'EUR',
         min_order_qty:      values.min_order_qty,
         required_materials: requiredMaterials,
       });
@@ -219,6 +223,7 @@ export default function ProducerListingsManagePage() {
 
     editForm.setFieldsValue({
       service_price: Number(listing.service_price),
+      currency: listing.currency || 'EUR',
       min_order_qty: listing.min_order_qty ? Number(listing.min_order_qty) : undefined,
       description: listing.description,
     });
@@ -231,6 +236,7 @@ export default function ProducerListingsManagePage() {
 
   async function onEditSubmit(values: {
     service_price: number;
+    currency?: string;
     min_order_qty?: number;
     description?: string;
   }) {
@@ -246,6 +252,8 @@ export default function ProducerListingsManagePage() {
       await listingService.updateProducerListing(editingListing.id, {
         description:         values.description || null,
         service_price:       values.service_price,
+        currency:            values.currency || 'EUR',
+        service_unit:        'paket',
         min_order_qty:       values.min_order_qty || null,
         required_materials:  requiredMaterials,
       });
@@ -283,12 +291,12 @@ export default function ProducerListingsManagePage() {
       render: (v: string) => v || '—',
     },
     {
-      title: t('production.serviceCost'), dataIndex: 'service_price', key: 'service_price',
-      render: (v: number) => `${Number(v).toFixed(2)} € / kg`,
+      title: 'Paket Başı Hizmet Bedeli', dataIndex: 'service_price', key: 'service_price',
+      render: (v: number, r: Listing) => `${Number(v).toFixed(2)} ${r.currency || '€'} / paket`,
     },
     {
       title: t('producerListings.minOrder'), dataIndex: 'min_order_qty', key: 'min_order_qty',
-      render: (v: number) => v ? `${v} kg` : '—',
+      render: (v: number) => v ? `${v} paket` : '—',
     },
     {
       title: t('common.status'), dataIndex: 'is_active', key: 'is_active',
@@ -451,17 +459,25 @@ export default function ProducerListingsManagePage() {
           </Divider>
 
           <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item
-                name="service_price" label={`${t('producerListings.serviceCost')} (€/kg)`}
-                rules={[{ required: true, message: t('producerListings.priceRequired') }]}
-              >
-                <InputNumber min={0} step={0.01} precision={2} style={{ width: '100%' }} addonAfter="€/kg" />
+            <Col span={14}>
+              <Form.Item label="Paket Başı Hizmet Bedeli" required>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <Form.Item
+                    name="service_price"
+                    noStyle
+                    rules={[{ required: true, message: t('producerListings.priceRequired') }]}
+                  >
+                    <InputNumber min={0} step={0.01} precision={2} style={{ flex: 1 }} placeholder="0.00" addonAfter="/ paket" />
+                  </Form.Item>
+                  <Form.Item name="currency" noStyle initialValue="EUR">
+                    <CurrencySelect />
+                  </Form.Item>
+                </div>
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item name="min_order_qty" label={`${t('producerListings.minOrder')} (kg)`}>
-                <InputNumber min={0} step={1} precision={0} style={{ width: '100%' }} addonAfter="kg" />
+            <Col span={10}>
+              <Form.Item name="min_order_qty" label="Min. Sipariş (paket)">
+                <InputNumber min={1} step={1} precision={0} style={{ width: '100%' }} addonAfter="paket" />
               </Form.Item>
             </Col>
           </Row>
@@ -522,17 +538,25 @@ export default function ProducerListingsManagePage() {
           </Divider>
 
           <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item
-                name="service_price" label={`${t('producerListings.serviceCost')} (€/kg)`}
-                rules={[{ required: true, message: t('producerListings.priceRequired') }]}
-              >
-                <InputNumber min={0} step={0.01} precision={2} style={{ width: '100%' }} addonAfter="€/kg" />
+            <Col span={14}>
+              <Form.Item label="Paket Başı Hizmet Bedeli" required>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <Form.Item
+                    name="service_price"
+                    noStyle
+                    rules={[{ required: true, message: t('producerListings.priceRequired') }]}
+                  >
+                    <InputNumber min={0} step={0.01} precision={2} style={{ flex: 1 }} placeholder="0.00" addonAfter="/ paket" />
+                  </Form.Item>
+                  <Form.Item name="currency" noStyle initialValue="EUR">
+                    <CurrencySelect />
+                  </Form.Item>
+                </div>
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item name="min_order_qty" label={`${t('producerListings.minOrder')} (kg)`}>
-                <InputNumber min={0} step={1} precision={0} style={{ width: '100%' }} addonAfter="kg" />
+            <Col span={10}>
+              <Form.Item name="min_order_qty" label="Min. Sipariş (paket)">
+                <InputNumber min={1} step={1} precision={0} style={{ width: '100%' }} addonAfter="paket" />
               </Form.Item>
             </Col>
           </Row>

@@ -292,7 +292,7 @@ CREATE TABLE IF NOT EXISTS market_purchases (
     unit            VARCHAR(20)  NOT NULL,
     unit_price      DECIMAL(12,4) NOT NULL,
     total_price     DECIMAL(12,2) NOT NULL,
-    status          ENUM('beklemede','onaylandi','sevk_edildi','teslim_alindi') NOT NULL DEFAULT 'beklemede',
+    status          ENUM('beklemede','onaylandi','sevk_edildi','teslim_alindi','geri_cagrildi') NOT NULL DEFAULT 'beklemede',
     purchase_date   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     notes           TEXT,
     FOREIGN KEY (market_id)  REFERENCES users(id),

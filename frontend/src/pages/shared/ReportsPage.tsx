@@ -10,6 +10,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { reportService, mlService, anomalyService } from '../../services/api';
+import { useAuthStore } from '../../store/authStore';
 import { useTranslation } from '../../i18n';
 import { formatUnit, formatDbStatus, formatDbPart } from '../../i18n/formatters';
 
@@ -17,6 +18,8 @@ const { Title, Text, Paragraph } = Typography;
 
 export default function ReportsPage() {
   const { t } = useTranslation();
+  const { user } = useAuthStore();
+  const role = user?.role || 'hayvanci';
   const [loading, setLoading] = useState(true);
 
   // Veri durumları
@@ -421,80 +424,177 @@ export default function ReportsPage() {
         </Space>
       </div>
 
-      {/* ── Üst KPI Kartları ─────────────────────────────────────────────────── */}
+      {/* ── Üst KPI Kartları (Rol Bazlı) ─────────────────────────────────────────────────── */}
       {summary && (
         <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-          <Col xs={24} sm={12} lg={6}>
-            <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #1890ff' }}>
-              <Statistic
-                title={t('dashboard.kpiTotalRawCost')}
-                value={summary.rawMaterials?.totalCost || 0}
-                precision={2}
-                suffix="€"
-                valueStyle={{ color: '#1890ff' }}
-              />
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                {summary.rawMaterials?.itemCount || 0} {t('common.quantity')}
-              </Text>
-            </Card>
-          </Col>
-
-          <Col xs={24} sm={12} lg={6}>
-            <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #fa8c16' }}>
-              <Statistic
-                title={t('dashboard.kpiAvgEkp')}
-                value={summary.production?.avgEkp || 0}
-                precision={4}
-                suffix="€/kg"
-                valueStyle={{ color: '#fa8c16' }}
-              />
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                VKP: {summary.production?.avgVkp?.toFixed(4)} € · Marj: %{summary.production?.avgMarginPercent}
-              </Text>
-            </Card>
-          </Col>
-
-          <Col xs={24} sm={12} lg={6}>
-            <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #52c41a' }}>
-              <Statistic
-                title={t('dashboard.kpiSalesRevenue')}
-                value={summary.sales?.totalRevenue || 0}
-                precision={2}
-                suffix="€"
-                valueStyle={{ color: '#52c41a' }}
-              />
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                {summary.sales?.saleCount || 0} {t('nav.sales')} · {summary.sales?.totalSoldQty || 0} {t('common.unit')}
-              </Text>
-            </Card>
-          </Col>
-
-          <Col xs={24} sm={12} lg={6}>
-            <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #cf1322' }}>
-              <Statistic
-                title={t('dashboard.kpiWasteRate')}
-                value={summary.butchery?.averageWastePercent || 0}
-                precision={2}
-                suffix="%"
-                valueStyle={{ color: (summary.butchery?.averageWastePercent || 0) > 10 ? '#cf1322' : '#52c41a' }}
-              />
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                {summary.lots?.recalledLots || 0} {t('common.recalled')} / {t('common.blocked')}
-              </Text>
-            </Card>
-          </Col>
+          {role === 'sucukcu' ? (
+            <>
+              <Col xs={24} sm={12} lg={6}>
+                <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #1890ff' }}>
+                  <Statistic
+                    title="Tamamlanan Üretim"
+                    value={summary.production?.completedOrders || 0}
+                    suffix={`/ ${summary.production?.totalOrders || 0}`}
+                    valueStyle={{ color: '#1890ff' }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>Fason Üretim Emirleri</Text>
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #52c41a' }}>
+                  <Statistic
+                    title="Fason Hizmet Geliri"
+                    value={summary.production?.totalServiceCost || 0}
+                    precision={2}
+                    suffix="€"
+                    valueStyle={{ color: '#52c41a' }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>Toplam Hizmet Bedeli</Text>
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #fa8c16' }}>
+                  <Statistic
+                    title="Üretilen Paket"
+                    value={summary.production?.totalOutputQty || 0}
+                    precision={0}
+                    suffix="paket"
+                    valueStyle={{ color: '#fa8c16' }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>Mamul Teslimatı</Text>
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #722ed1' }}>
+                  <Statistic
+                    title="Ortalama EKP"
+                    value={summary.production?.avgEkp || 0}
+                    precision={4}
+                    suffix="€/paket"
+                    valueStyle={{ color: '#722ed1' }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>Etkin Koli / Paket Maliyeti</Text>
+                </Card>
+              </Col>
+            </>
+          ) : role === 'market' ? (
+            <>
+              <Col xs={24} sm={12} lg={6}>
+                <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #1890ff' }}>
+                  <Statistic
+                    title="Satın Alınan Paket"
+                    value={summary.sales?.totalSoldQty || 0}
+                    precision={0}
+                    suffix="paket"
+                    valueStyle={{ color: '#1890ff' }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>Toplam Mamul Alımı</Text>
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #52c41a' }}>
+                  <Statistic
+                    title="Satın Alma Tutarı"
+                    value={summary.sales?.totalRevenue || 0}
+                    precision={2}
+                    suffix="€"
+                    valueStyle={{ color: '#52c41a' }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>Toplam Harcama</Text>
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #fa8c16' }}>
+                  <Statistic
+                    title="Alışveriş İşlemi"
+                    value={summary.sales?.saleCount || 0}
+                    valueStyle={{ color: '#fa8c16' }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>Tamamlanan Siparişler</Text>
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #cf1322' }}>
+                  <Statistic
+                    title="Geri Çağırma Uyarısı"
+                    value={summary.lots?.recalledLots || 0}
+                    valueStyle={{ color: (summary.lots?.recalledLots || 0) > 0 ? '#cf1322' : '#52c41a' }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>Etkilenen Parti / Ürün</Text>
+                </Card>
+              </Col>
+            </>
+          ) : (
+            // Hayvanci & Admin
+            <>
+              <Col xs={24} sm={12} lg={6}>
+                <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #1890ff' }}>
+                  <Statistic
+                    title={t('dashboard.kpiTotalRawCost')}
+                    value={summary.rawMaterials?.totalCost || 0}
+                    precision={2}
+                    suffix="€"
+                    valueStyle={{ color: '#1890ff' }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    {summary.rawMaterials?.itemCount || 0} {t('common.quantity')}
+                  </Text>
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #52c41a' }}>
+                  <Statistic
+                    title={t('dashboard.kpiSalesRevenue')}
+                    value={summary.sales?.totalRevenue || 0}
+                    precision={2}
+                    suffix="€"
+                    valueStyle={{ color: '#52c41a' }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    {summary.sales?.saleCount || 0} {t('nav.sales')} · {summary.sales?.totalSoldQty || 0} paket
+                  </Text>
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #fa8c16' }}>
+                  <Statistic
+                    title={t('dashboard.kpiWasteRate')}
+                    value={summary.butchery?.averageWastePercent || 0}
+                    precision={2}
+                    suffix="%"
+                    valueStyle={{ color: (summary.butchery?.averageWastePercent || 0) > 10 ? '#cf1322' : '#52c41a' }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    Parçalama & Kesim Firesi
+                  </Text>
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Card size="small" style={{ borderRadius: 10, borderLeft: '4px solid #cf1322' }}>
+                  <Statistic
+                    title="Geri Çağrılan Lotlar"
+                    value={summary.lots?.recalledLots || 0}
+                    valueStyle={{ color: (summary.lots?.recalledLots || 0) > 0 ? '#cf1322' : '#52c41a' }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    {summary.lots?.activeLots || 0} Aktif Lot
+                  </Text>
+                </Card>
+              </Col>
+            </>
+          )}
         </Row>
       )}
 
       {/* ── Raporlama Sekmeleri ──────────────────────────────────────────────── */}
       <Tabs
-        defaultActiveKey="production"
+        defaultActiveKey={role === 'sucukcu' ? 'production' : role === 'market' ? 'sales' : 'butchery'}
         type="card"
         size="small"
         tabBarGutter={6}
         items={[
-          // SEKME 1: ÜRETİM VE EKP MALİYET RAPORU
-          {
+          // SEKME 1: ÜRETİM VE EKP MALİYET RAPORU (Sadece sucukcu ve admin)
+          (role === 'admin' || role === 'sucukcu') ? {
             key: 'production',
             label: <span><ExperimentOutlined /> {t('reports.tabProduction')}</span>,
             children: (
@@ -514,10 +614,10 @@ export default function ReportsPage() {
                 />
               </div>
             ),
-          },
+          } : null,
 
-          // SEKME 2: PARÇALAMA VE FİRE DENGE RAPORU
-          {
+          // SEKME 2: PARÇALAMA VE FİRE DENGE RAPORU (Sadece hayvanci ve admin)
+          (role === 'admin' || role === 'hayvanci') ? {
             key: 'butchery',
             label: <span><ScissorOutlined /> {t('reports.tabButchery')}</span>,
             children: (
@@ -557,7 +657,7 @@ export default function ReportsPage() {
                 />
               </div>
             ),
-          },
+          } : null,
 
           // SEKME 3: LOT HAREKETLERİ DENETİM İZİ
           {
@@ -575,10 +675,10 @@ export default function ReportsPage() {
             ),
           },
 
-          // SEKME 4: SATIŞ VE CİRO RAPORU
-          {
+          // SEKME 4: SATIŞ VE CİRO RAPORU (hayvanci, market, admin - sucukcuda gösterilmez)
+          (role === 'admin' || role === 'hayvanci' || role === 'market') ? {
             key: 'sales',
-            label: <span><ShoppingOutlined /> {t('reports.tabSales')}</span>,
+            label: <span><ShoppingOutlined /> {role === 'market' ? 'Satın Alma Raporu' : t('reports.tabSales')}</span>,
             children: (
               <div>
                 <Table
@@ -589,7 +689,7 @@ export default function ReportsPage() {
                 />
               </div>
             ),
-          },
+          } : null,
 
           // SEKME 5: GERİ ÇAĞIRMA (RECALL) RAPORU
           {
@@ -635,8 +735,8 @@ export default function ReportsPage() {
             ),
           },
 
-          // SEKME 6: YAPAY ZEKA (ML) DOĞRULAMA VE REFERANS MODEL KARŞILAŞTIRMASI
-          {
+          // SEKME 6: YAPAY ZEKA (ML) DOĞRULAMA VE REFERANS MODEL KARŞILAŞTIRMASI (Markette yok)
+          role !== 'market' ? {
             key: 'ml_evaluation',
             label: <span>🤖 {t('reports.tabMl')}</span>,
             children: (
@@ -645,8 +745,8 @@ export default function ReportsPage() {
                   <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
                 ) : (
                   <div>
-                    {/* Model A Değerlendirme Kartı */}
-                    {mlProdEval && (
+                    {/* Model A Değerlendirme Kartı - Sadece sucukcu ve admin */}
+                    {(role === 'admin' || role === 'sucukcu') && mlProdEval && (
                       <Card
                         title={
                           <Space>
@@ -742,8 +842,8 @@ export default function ReportsPage() {
                       </Card>
                     )}
 
-                    {/* Model B Değerlendirme Kartı */}
-                    {mlButchEval && (
+                    {/* Model B Değerlendirme Kartı - Sadece hayvanci ve admin */}
+                    {(role === 'admin' || role === 'hayvanci') && mlButchEval && (
                       <Card
                         title={
                           <Space>
@@ -818,7 +918,7 @@ export default function ReportsPage() {
                 )}
               </div>
             ),
-          },
+          } : null,
 
           // SEKME 7: AKILLI ANOMALİ VE RİSK İZLEME
           {
@@ -978,7 +1078,7 @@ export default function ReportsPage() {
               </div>
             ),
           },
-        ]}
+        ].filter(Boolean) as any}
       />
     </div>
   );

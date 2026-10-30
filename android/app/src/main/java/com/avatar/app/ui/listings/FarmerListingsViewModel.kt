@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.avatar.app.data.model.CreateFarmerListingRequest
 import com.avatar.app.data.model.FarmerListing
 import com.avatar.app.data.model.LotItem
+import com.avatar.app.data.model.UpdateFarmerListingRequest
 import com.avatar.app.data.remote.ApiClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -184,6 +185,7 @@ class FarmerListingsViewModel(application: Application) : AndroidViewModel(appli
     fun updateListing(
         id: Int,
         unitPrice: Double,
+        currency: String = "TL",
         quantity: Double,
         description: String?,
         onSuccess: () -> Unit
@@ -194,12 +196,14 @@ class FarmerListingsViewModel(application: Application) : AndroidViewModel(appli
         }
         viewModelScope.launch {
             try {
-                val body = mapOf(
-                    "unit_price" to unitPrice,
-                    "quantity" to quantity,
-                    "description" to description
+                val req = UpdateFarmerListingRequest(
+                    unitPrice = unitPrice,
+                    currency = currency,
+                    quantity = quantity,
+                    unit = "paket",
+                    description = description
                 )
-                val resp = apiClient.listingService.updateFarmerListing(id, body)
+                val resp = apiClient.listingService.updateFarmerListing(id, req)
                 if (resp.isSuccessful) {
                     _uiState.update { it.copy(successMessage = "İlan güncellendi") }
                     loadData()

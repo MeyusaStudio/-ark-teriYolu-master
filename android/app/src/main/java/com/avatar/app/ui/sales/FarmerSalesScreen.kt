@@ -349,7 +349,7 @@ fun SaleItemCard(
                         color = ForestGreen
                     )
                     Text(
-                        "${sale.quantity} ${sale.unit} × ${String.format(Locale.US, "%.2f", sale.unitPrice)}",
+                        "${sale.quantity.toInt()} paket × ${String.format(Locale.US, "%.2f", sale.unitPrice)}",
                         fontSize = 11.sp,
                         color = Color.DarkGray
                     )
@@ -392,6 +392,19 @@ fun SaleItemCard(
                         Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(13.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Fatura İndir / Gör", fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    if (!isRecalled) {
+                        Button(
+                            onClick = onInitiateRecall,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(12.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("Geri Çağır", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }

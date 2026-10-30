@@ -54,7 +54,8 @@ data class CreateProducerListingRequest(
     @SerializedName("product_name") val productName: String,
     val description: String?,
     @SerializedName("service_price") val servicePrice: Double,
-    @SerializedName("service_unit") val serviceUnit: String = "kg",
+    val currency: String = "TL",
+    @SerializedName("service_unit") val serviceUnit: String = "paket",
     @SerializedName("min_order_qty") val minOrderQty: Double?,
     @SerializedName("required_materials") val requiredMaterials: Map<String, IngredientSpec>
 )
@@ -92,6 +93,22 @@ data class CreateFarmerListingRequest(
     val unit: String = "paket",
     @SerializedName("unit_price") val unitPrice: Double,
     val currency: String = "EUR",
+    val description: String? = null
+)
+
+data class UpdateFarmerListingRequest(
+    @SerializedName("unit_price") val unitPrice: Double,
+    val currency: String? = "TL",
+    val quantity: Double,
+    val unit: String = "paket",
+    val description: String? = null
+)
+
+data class UpdateProducerListingRequest(
+    @SerializedName("service_price") val servicePrice: Double,
+    val currency: String? = "TL",
+    @SerializedName("service_unit") val serviceUnit: String = "paket",
+    @SerializedName("min_order_qty") val minOrderQty: Double? = null,
     val description: String? = null
 )
 

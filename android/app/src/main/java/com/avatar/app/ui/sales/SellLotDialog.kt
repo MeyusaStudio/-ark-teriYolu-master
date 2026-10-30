@@ -25,8 +25,10 @@ fun SellLotDialog(
     onConfirmSell: (customerName: String, quantity: Double, unitPrice: Double) -> Unit
 ) {
     var customerName by remember { mutableStateOf("Süpermarket A") }
-    var quantityText by remember { mutableStateOf("1.0") }
+    var quantityText by remember { mutableStateOf("1") }
+    var selectedCurrency by remember { mutableStateOf(if (lot.currency.isNotBlank()) lot.currency else "TL") }
     var unitPriceText by remember { mutableStateOf(lot.unit_cost?.let { "%.2f".format(it * 1.3) } ?: "25.0") }
+    val currencyOptions = listOf("TL", "EUR", "USD", "GBP")
 
     val quantity = quantityText.toDoubleOrNull() ?: 0.0
     val unitPrice = unitPriceText.toDoubleOrNull() ?: 0.0
@@ -80,7 +82,7 @@ fun SellLotDialog(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "Kalan: ${"%.2f".format(lot.quantity)} ${lot.unit}",
+                                text = "Kalan: ${lot.quantity.toInt()} paket",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (lot.isBlocked) ErrorRed else PrimaryBlue
@@ -120,23 +122,38 @@ fun SellLotDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    // Satış Miktarı
+                    // Satış Miktarı (paket)
                     OutlinedTextField(
                         value = quantityText,
                         onValueChange = { quantityText = it },
-                        label = { Text("Satılacak Miktar (${lot.unit}) *") },
-                        trailingIcon = { Text(lot.unit, modifier = Modifier.padding(end = 12.dp)) },
+                        label = { Text("Satılacak Miktar (paket) *") },
+                        trailingIcon = { Text("paket", modifier = Modifier.padding(end = 12.dp)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
 
+                    // Para Birimi Seçimi
+                    Text("Para Birimi:", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        currencyOptions.forEach { curr ->
+                            FilterChip(
+                                selected = selectedCurrency == curr,
+                                onClick = { selectedCurrency = curr },
+                                label = { Text(curr, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                            )
+                        }
+                    }
+
                     // Birim Fiyat
                     OutlinedTextField(
                         value = unitPriceText,
                         onValueChange = { unitPriceText = it },
-                        label = { Text("Birim Fiyat (${lot.currency} / ${lot.unit}) *") },
-                        trailingIcon = { Text(lot.currency, modifier = Modifier.padding(end = 12.dp)) },
+                        label = { Text("Birim Fiyat ($selectedCurrency / paket) *") },
+                        trailingIcon = { Text(selectedCurrency, modifier = Modifier.padding(end = 12.dp)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -155,7 +172,7 @@ fun SellLotDialog(
                         ) {
                             Text("Toplam Satış Tutarı:", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                             Text(
-                                text = "${"%.2f".format(totalAmount)} ${lot.currency}",
+                                text = "${"%.2f".format(totalAmount)} $selectedCurrency",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp,
                                 color = PrimaryBlue

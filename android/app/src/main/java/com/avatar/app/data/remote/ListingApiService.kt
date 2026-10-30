@@ -24,7 +24,7 @@ interface ListingApiService {
     @PUT("listings/producer/{id}")
     suspend fun updateProducerListing(
         @Path("id") id: Int,
-        @Body request: Map<String, Any?>
+        @Body request: UpdateProducerListingRequest
     ): Response<Map<String, Any>>
 
     @POST("listings/producer/{id}/toggle")
@@ -47,7 +47,7 @@ interface ListingApiService {
     @PUT("listings/farmer/{id}")
     suspend fun updateFarmerListing(
         @Path("id") id: Int,
-        @Body request: Map<String, Any?>
+        @Body request: UpdateFarmerListingRequest
     ): Response<Map<String, Any>>
 
     @POST("listings/farmer/{id}/toggle")

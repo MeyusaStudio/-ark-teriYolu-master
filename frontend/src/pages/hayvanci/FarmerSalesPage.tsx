@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import {
   Table, Tag, Typography, Button, Space, Card, Row, Col,
-  Statistic, Empty, App, Alert, Tabs, Modal, Descriptions, Badge,
+  Statistic, Empty, App, Alert, Tabs, Modal, Descriptions, Badge, Input,
 } from 'antd';
 import {
   DollarCircleOutlined, ShopOutlined, WarningOutlined,
@@ -10,12 +10,12 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
-import { purchaseService, invoiceService } from '../../services/api';
+import { purchaseService, invoiceService, recallService } from '../../services/api';
 import { Invoice } from '../../types';
 import { InvoiceModal } from '../../components/InvoiceModal';
 import { formatMoney, convertToEur } from '../../utils/currency';
 import { useTranslation } from '../../i18n';
-import { formatUnit, formatDbProduct } from '../../i18n/formatters';
+import { formatDbProduct } from '../../i18n/formatters';
 
 const { Title, Text } = Typography;
 
@@ -68,6 +68,44 @@ export default function FarmerSalesPage() {
   const [selectedSale, setSelectedSale] = useState<SaleItem | null>(null);
   const [invoiceModalVisible, setInvoiceModalVisible] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+
+  // Doğrudan sipariş/satış üzerinden geri çağırma modalı
+  const [recallModalOpen, setRecallModalOpen] = useState(false);
+  const [targetRecallLot, setTargetRecallLot] = useState<{
+    lot_id: number;
+    lot_number: string;
+    product_name?: string;
+    market_name?: string;
+  } | null>(null);
+  const [recallReason, setRecallReason] = useState('');
+  const [recalling, setRecalling] = useState(false);
+
+  function openInlineRecallModal(lotId: number, lotNumber: string, productName?: string, marketName?: string) {
+    setTargetRecallLot({ lot_id: lotId, lot_number: lotNumber, product_name: productName, market_name: marketName });
+    setRecallReason('Mikrobiyolojik kontaminasyon riski ve kalite standart dışılığı şüphesi');
+    setRecallModalOpen(true);
+  }
+
+  async function submitInlineRecall() {
+    if (!targetRecallLot || !recallReason.trim()) return;
+    setRecalling(true);
+    try {
+      const { data } = await recallService.initiate({
+        lot_id: targetRecallLot.lot_id,
+        reason: recallReason.trim(),
+      });
+      message.success(`⛔ Geri çağırma başlatıldı! ${data.affectedMarkets || 1} market bilgilendirildi ve parti bloke edildi.`);
+      setRecallModalOpen(false);
+      setRecallReason('');
+      setTargetRecallLot(null);
+      await loadData();
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.error || 'Geri çağırma başlatılamadı';
+      message.error(errMsg);
+    } finally {
+      setRecalling(false);
+    }
+  }
 
   async function openInvoice(purchaseId: number) {
     try {
@@ -152,13 +190,13 @@ export default function FarmerSalesPage() {
     {
       title: t('common.quantity'),
       key: 'quantity',
-      render: (_: unknown, r: SaleItem) => `${Number(r.quantity).toFixed(2)} ${formatUnit(r.unit, t)}`,
+      render: (_: unknown, r: SaleItem) => `${Number(r.quantity).toFixed(0)} paket`,
     },
     {
       title: t('common.unitPrice'),
       dataIndex: 'unit_price',
       key: 'unit_price',
-      render: (v: number, r: SaleItem) => `${formatMoney(v, r.currency)} / ${formatUnit(r.unit, t)}`,
+      render: (v: number, r: SaleItem) => `${formatMoney(v, r.currency)} / paket`,
     },
     {
       title: t('common.totalPrice'),
@@ -219,11 +257,14 @@ export default function FarmerSalesPage() {
           >
             {t('nav.lotTrace')}
           </Button>
-          {(Number(r.complaint_count || 0) > 0 || r.lot_status === 'recalled') && (
+          {r.lot_status === 'recalled' ? (
+            <Tag color="red">{t('common.recalled')}</Tag>
+          ) : (
             <Button
               size="small"
               danger
-              onClick={() => navigate('/recalls')}
+              icon={<WarningOutlined />}
+              onClick={() => openInlineRecallModal(r.lot_id, r.lot_number, r.product_name, r.market_name)}
             >
               {t('recalls.startRecall')}
             </Button>
@@ -280,14 +321,18 @@ export default function FarmerSalesPage() {
           >
             {t('nav.lotTrace')}
           </Button>
-          <Button
-            size="small"
-            danger
-            icon={<WarningOutlined />}
-            onClick={() => navigate('/recalls')}
-          >
-            {t('recalls.startRecall')}
-          </Button>
+          {c.lot_status === 'recalled' ? (
+            <Tag color="red">{t('common.recalled')}</Tag>
+          ) : (
+            <Button
+              size="small"
+              danger
+              icon={<WarningOutlined />}
+              onClick={() => openInlineRecallModal(c.lot_id, c.lot_number, 'Mamul Ürün', 'Market')}
+            >
+              {t('recalls.startRecall')}
+            </Button>
+          )}
         </Space>
       ),
     },
@@ -478,10 +523,10 @@ export default function FarmerSalesPage() {
                 <Tag color="blue">{selectedSale.lot_number}</Tag>
               </Descriptions.Item>
               <Descriptions.Item label={t('common.quantity')}>
-                <Text strong>{Number(selectedSale.quantity).toFixed(2)} {selectedSale.unit}</Text>
+                <Text strong>{Number(selectedSale.quantity).toFixed(0)} paket</Text>
               </Descriptions.Item>
               <Descriptions.Item label={t('common.unitPrice')}>
-                {formatMoney(selectedSale.unit_price, selectedSale.currency)} / {selectedSale.unit}
+                {formatMoney(selectedSale.unit_price, selectedSale.currency)} / paket
               </Descriptions.Item>
               <Descriptions.Item label={t('common.totalPrice')} span={2}>
                 <Text strong style={{ color: '#52c41a', fontSize: 16 }}>
@@ -492,6 +537,64 @@ export default function FarmerSalesPage() {
                 {dayjs(selectedSale.purchase_date).format('DD.MM.YYYY HH:mm:ss')}
               </Descriptions.Item>
             </Descriptions>
+          </div>
+        )}
+      </Modal>
+
+      {/* Doğrudan Satış Üzerinden Geri Çağırma (Inline Modal) */}
+      <Modal
+        title={<span><WarningOutlined style={{ color: '#cf1322', marginRight: 8 }} />{t('recalls.startRecall')}</span>}
+        open={recallModalOpen}
+        onCancel={() => { setRecallModalOpen(false); setTargetRecallLot(null); }}
+        footer={null}
+      >
+        {targetRecallLot && (
+          <div>
+            <Alert
+              type="error"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="Dikkat: Mamul Geri Çağırma (Recall)"
+              description={`Lot ${targetRecallLot.lot_number} için geri çağırma başlatıldığında bu parti sistem tarafından bloke edilecek ve satın alan marketlere derhal acil bildirim iletilecektir.`}
+            />
+            <Descriptions bordered size="small" column={1} style={{ marginBottom: 16 }}>
+              <Descriptions.Item label={t('common.lotNumber')}>
+                <Tag color="red" style={{ fontWeight: 600 }}>{targetRecallLot.lot_number}</Tag>
+              </Descriptions.Item>
+              {targetRecallLot.product_name && (
+                <Descriptions.Item label={t('listings.productName')}>
+                  {targetRecallLot.product_name}
+                </Descriptions.Item>
+              )}
+              {targetRecallLot.market_name && (
+                <Descriptions.Item label={t('sales.buyerMarket')}>
+                  {targetRecallLot.market_name}
+                </Descriptions.Item>
+              )}
+            </Descriptions>
+            <div style={{ marginBottom: 16 }}>
+              <Text strong style={{ display: 'block', marginBottom: 6 }}>{t('recalls.recallReason')} *</Text>
+              <Input.TextArea
+                rows={3}
+                value={recallReason}
+                onChange={(e: any) => setRecallReason(e.target.value)}
+                placeholder="Geri çağırma gerekçesini giriniz..."
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Button onClick={() => { setRecallModalOpen(false); setTargetRecallLot(null); }}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                type="primary"
+                danger
+                loading={recalling}
+                disabled={!recallReason.trim()}
+                onClick={submitInlineRecall}
+              >
+                {t('recalls.startRecall')}
+              </Button>
+            </div>
           </div>
         )}
       </Modal>

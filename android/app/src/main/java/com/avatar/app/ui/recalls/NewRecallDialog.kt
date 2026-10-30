@@ -154,7 +154,7 @@ fun NewRecallDialog(
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(lot.displayName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                         Text(
-                                            "Lot: ${lot.lot_number} • ${lot.quantity} ${lot.unit} • Tür: ${lot.lot_type}",
+                                            "Lot: ${lot.lot_number} • ${lot.quantity} paket • Tür: Mamül",
                                             fontSize = 11.sp,
                                             color = Color.Gray
                                         )

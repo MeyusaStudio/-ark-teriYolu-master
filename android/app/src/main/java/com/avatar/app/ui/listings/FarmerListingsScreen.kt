@@ -61,8 +61,8 @@ fun FarmerListingsScreen(
         EditFarmerListingDialog(
             listing = listing,
             onDismiss = { editingListing = null },
-            onConfirm = { price, qty, desc ->
-                viewModel.updateListing(listing.id, price, qty, desc) {
+            onConfirm = { price, curr, qty, desc ->
+                viewModel.updateListing(listing.id, price, curr, qty, desc) {
                     editingListing = null
                 }
             }
@@ -262,7 +262,7 @@ fun FarmerListingsScreen(
                                             color = ForestGreen
                                         )
                                         Text(
-                                            "Stok: ${listing.quantity} ${listing.unit}",
+                                            "Stok: ${listing.quantity.toInt()} paket",
                                             fontSize = 11.sp,
                                             color = Color.DarkGray
                                         )

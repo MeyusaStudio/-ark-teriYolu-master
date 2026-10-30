@@ -325,9 +325,9 @@ fun HayvanciProducerListingCard(
                 }
 
                 Text(
-                    String.format(Locale.US, "%.2f €/kg", listing.servicePrice),
+                    String.format(Locale.US, "%.2f %s / paket", listing.servicePrice, listing.currency ?: "TL"),
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+                    fontSize = 15.sp,
                     color = ForestGreen
                 )
             }
@@ -358,7 +358,7 @@ fun HayvanciProducerListingCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "Min. ${listing.minOrderQty ?: 1.0} kg",
+                    "Min. ${(listing.minOrderQty ?: 1.0).toInt()} paket",
                     fontSize = 11.sp,
                     color = Color.Gray
                 )

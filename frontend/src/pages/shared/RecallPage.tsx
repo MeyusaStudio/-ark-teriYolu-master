@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Table, Tag, Button, Modal, Form, Input, Select, Typography, message, Card, Descriptions } from 'antd';
+import { Table, Tag, Button, Modal, Form, Input, Select, Typography, message, Card, Descriptions, Alert } from 'antd';
 import { WarningOutlined, EyeOutlined } from '@ant-design/icons';
-import { recallService, lotService } from '../../services/api';
-import { Recall, Lot } from '../../types';
+import { recallService } from '../../services/api';
+import { Recall } from '../../types';
 import { useTranslation } from '../../i18n';
 import { formatUnit, formatDbStatus } from '../../i18n/formatters';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 export default function RecallPage() {
   const { t } = useTranslation();
   const [recalls, setRecalls]         = useState<Recall[]>([]);
-  const [lots, setLots]               = useState<Lot[]>([]);
+  const [lots, setLots]               = useState<any[]>([]);
   const [loading, setLoading]         = useState(true);
   const [modalOpen, setModalOpen]     = useState(false);
   const [detailOpen, setDetailOpen]   = useState(false);
@@ -19,8 +19,8 @@ export default function RecallPage() {
   const [form] = Form.useForm();
 
   useEffect(() => {
-    Promise.all([recallService.getAll(), lotService.getAll()])
-      .then(([r, l]) => { setRecalls(r.data); setLots(l.data); })
+    Promise.all([recallService.getAll(), recallService.getRecallableLots()])
+      .then(([r, l]) => { setRecalls(r.data); setLots(l.data || []); })
       .catch(() => message.error('Veriler yüklenemedi'))
       .finally(() => setLoading(false));
   }, []);
@@ -31,10 +31,15 @@ export default function RecallPage() {
       message.success(`Geri çağırma başlatıldı. ${data.affectedMarkets} market etkilendi.`);
       setModalOpen(false);
       form.resetFields();
-      const { data: updated } = await recallService.getAll();
-      setRecalls(updated);
-    } catch {
-      message.error('Geri çağırma başlatılamadı');
+      const [{ data: updatedRecalls }, { data: updatedLots }] = await Promise.all([
+        recallService.getAll(),
+        recallService.getRecallableLots(),
+      ]);
+      setRecalls(updatedRecalls);
+      setLots(updatedLots || []);
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.error || 'Geri çağırma başlatılamadı';
+      message.error(errMsg);
     }
   }
 
@@ -67,18 +72,32 @@ export default function RecallPage() {
       <Table dataSource={recalls} columns={columns} rowKey="id" loading={loading} />
 
       <Modal title={t('recalls.startRecall')} open={modalOpen} onCancel={() => setModalOpen(false)} footer={null}>
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Geri Çağırma Kuralı"
+          description="Yalnızca marketlere satışı yapılmış mamul ürün lotları (sucuk, salam, sosis vb.) geri çağrılabilir."
+        />
         <Form form={form} onFinish={onSubmit} layout="vertical">
-          <Form.Item name="lot_id" label={t('common.lotNumber')} rules={[{ required: true }]}>
-            <Select showSearch optionFilterProp="children" placeholder="Lot">
-              {lots.filter(l => l.status === 'active').map(l => (
-                <Select.Option key={l.id} value={l.id}>{l.lot_number} — {l.quantity} {formatUnit(l.unit, t)}</Select.Option>
+          <Form.Item name="lot_id" label={t('common.lotNumber')} rules={[{ required: true, message: 'Lütfen bir mamul lotu seçin' }]}>
+            <Select showSearch optionFilterProp="children" placeholder="Markete satılmış mamul lotu seçin">
+              {lots.map((l: any) => (
+                <Select.Option key={l.id} value={l.id}>
+                  {l.lot_number} — {l.product_name || 'Mamul'} ({l.quantity} {formatUnit(l.unit || 'paket', t)})
+                </Select.Option>
               ))}
             </Select>
           </Form.Item>
+          {lots.length === 0 && (
+            <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 12 }}>
+              Geri çağrılabilecek markete satılmış mamul lot bulunamadı.
+            </Text>
+          )}
           <Form.Item name="reason" label={t('recalls.recallReason')} rules={[{ required: true, min: 10 }]}>
-            <Input.TextArea rows={3} placeholder="..." />
+            <Input.TextArea rows={3} placeholder="Mikrobiyolojik uygunsuzluk veya bozulma şüphesi..." />
           </Form.Item>
-          <Button type="primary" danger htmlType="submit" block>{t('recalls.startRecall')}</Button>
+          <Button type="primary" danger htmlType="submit" block disabled={lots.length === 0}>{t('recalls.startRecall')}</Button>
         </Form>
       </Modal>
 

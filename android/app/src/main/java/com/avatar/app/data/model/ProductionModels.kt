@@ -26,6 +26,7 @@ data class ProductionOrder(
 data class CompleteProductionRequest(
     @SerializedName("actual_qty") val actualQty: Double,
     @SerializedName("service_cost") val serviceCost: Double,
+    @SerializedName("unit_service_cost") val unitServiceCost: Double? = null,
     @SerializedName("production_date") val productionDate: String
 )
 

@@ -35,18 +35,20 @@ fun CreateFarmerListingDialog(
 ) {
     var selectedLot by remember { mutableStateOf(availableLots.firstOrNull()) }
     var productName by remember { mutableStateOf(selectedLot?.displayName ?: "Fermente Kangal Sucuk") }
-    var quantityText by remember { mutableStateOf(selectedLot?.quantity?.toString() ?: "10.0") }
-    var unit by remember { mutableStateOf(selectedLot?.unit ?: "paket") }
+    var quantityText by remember { mutableStateOf(selectedLot?.quantity?.toInt()?.toString() ?: "10") }
+    val unit = "paket"
     var unitPriceText by remember { mutableStateOf(if ((selectedLot?.unit_cost ?: 0.0) > 0) String.format(Locale.US, "%.2f", (selectedLot?.unit_cost ?: 0.0) * 1.3) else "12.50") }
-    var currency by remember { mutableStateOf(selectedLot?.currency ?: "EUR") }
+    var currency by remember { mutableStateOf(selectedLot?.currency ?: "TL") }
     var description by remember { mutableStateOf("Geleneksel yöntemlerle fermente edilmiş, katkısız kaliteli mamul sucuk.") }
+    val currencyOptions = listOf("TL", "EUR", "USD", "GBP")
 
     LaunchedEffect(selectedLot) {
         selectedLot?.let { lot ->
             productName = lot.displayName
-            quantityText = lot.quantity.toString()
-            unit = lot.unit
-            currency = lot.currency
+            quantityText = lot.quantity.toInt().toString()
+            if (!lot.currency.isNullOrBlank()) {
+                currency = lot.currency
+            }
             val cost = lot.unit_cost ?: 0.0
             if (cost > 0) {
                 unitPriceText = String.format(Locale.US, "%.2f", cost * 1.3)
@@ -173,14 +175,14 @@ fun CreateFarmerListingDialog(
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(lot.displayName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                         Text(
-                                            "Lot: ${lot.lot_number} • Stok: ${lot.quantity} ${lot.unit}",
+                                            "Lot: ${lot.lot_number} • Stok: ${lot.quantity.toInt()} paket",
                                             fontSize = 11.sp,
                                             color = Color.Gray
                                         )
                                         val cost = lot.unit_cost ?: 0.0
                                         if (cost > 0) {
                                             Text(
-                                                "Maliyet (EKP): ${String.format(Locale.US, "%.2f", cost)} ${lot.currency}/${lot.unit}",
+                                                "Maliyet (EKP): ${String.format(Locale.US, "%.2f", cost)} ${lot.currency ?: "TL"}/paket",
                                                 fontSize = 10.sp,
                                                 color = PrimaryBlue,
                                                 fontWeight = FontWeight.Medium
@@ -207,43 +209,41 @@ fun CreateFarmerListingDialog(
                         }
 
                         item {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = quantityText,
-                                    onValueChange = { quantityText = it },
-                                    label = { Text("Satış Miktarı") },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                    modifier = Modifier.weight(1.5f),
-                                    singleLine = true
-                                )
-                                OutlinedTextField(
-                                    value = unit,
-                                    onValueChange = { unit = it },
-                                    label = { Text("Birim") },
-                                    modifier = Modifier.weight(1f),
-                                    singleLine = true
-                                )
+                            OutlinedTextField(
+                                value = quantityText,
+                                onValueChange = { quantityText = it },
+                                label = { Text("Satış Miktarı (paket)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                        }
+
+                        item {
+                            Text("Para Birimi Seçin:", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                currencyOptions.forEach { curr ->
+                                    FilterChip(
+                                        selected = currency == curr,
+                                        onClick = { currency = curr },
+                                        label = { Text(curr, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                                    )
+                                }
                             }
                         }
 
                         item {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = unitPriceText,
-                                    onValueChange = { unitPriceText = it },
-                                    label = { Text("Birim Satış Fiyatı") },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                    modifier = Modifier.weight(1.5f),
-                                    singleLine = true
-                                )
-                                OutlinedTextField(
-                                    value = currency,
-                                    onValueChange = { currency = it.uppercase() },
-                                    label = { Text("Para Birimi") },
-                                    modifier = Modifier.weight(1f),
-                                    singleLine = true
-                                )
-                            }
+                            OutlinedTextField(
+                                value = unitPriceText,
+                                onValueChange = { unitPriceText = it },
+                                label = { Text("Birim Satış Fiyatı ($currency / paket)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
                         }
 
                         item {

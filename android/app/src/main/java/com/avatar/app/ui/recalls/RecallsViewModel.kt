@@ -46,11 +46,10 @@ class RecallsViewModel(application: Application) : AndroidViewModel(application)
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             try {
                 val recallResp = apiClient.recallService.getRecalls()
-                val lotsResp = apiClient.lotService.getLots()
+                val lotsResp = apiClient.recallService.getRecallableLots()
 
                 val recalls = recallResp.body() ?: emptyList()
-                val recalledLotIds = recalls.filter { it.status == "aktif" }.map { it.lotId }.toSet()
-                val lots = (lotsResp.body() ?: emptyList()).filter { !it.isBlocked && it.status != "recalled" && !recalledLotIds.contains(it.id) }
+                val lots = lotsResp.body() ?: emptyList()
 
                 _uiState.update {
                     it.copy(

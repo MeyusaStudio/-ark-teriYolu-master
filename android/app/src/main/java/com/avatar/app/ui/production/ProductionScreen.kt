@@ -367,7 +367,7 @@ fun CompleteProductionDialog(
                                             }
                                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                                 Text("Gerçekleşen Çıktı:", fontSize = 12.sp, color = Color.Gray)
-                                                Text("${Math.round(res.actualQty ?: 0.0)} Paket (${String.format(Locale.US, "%.2f", res.actualQty ?: 0.0)} kg)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                Text("${Math.round(res.actualQty ?: 0.0)} Paket", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                             }
                                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                                 Text("Oluşan Fire:", fontSize = 12.sp, color = Color.Gray)
@@ -505,13 +505,20 @@ fun CompleteProductionDialog(
                         // Fason Hizmet Bedeli
                         item {
                             OutlinedTextField(
-                                value = if (state.serviceCost > 0) state.serviceCost.toString() else "",
+                                value = if (state.unitServiceCost > 0) state.unitServiceCost.toString() else "",
                                 onValueChange = {
                                     val v = it.toDoubleOrNull() ?: 0.0
-                                    viewModel.updateCompleteForm(serviceCost = v)
+                                    viewModel.updateCompleteForm(unitServiceCost = v)
                                 },
-                                label = { Text("Fason Hizmet Bedeli (€)", fontSize = 12.sp) },
-                                supportingText = { Text("Sucukçu işçilik ve operasyon hizmet bedeli", fontSize = 10.sp) },
+                                label = { Text("Paket Başı Fason Hizmet Bedeli (€ / paket)", fontSize = 12.sp) },
+                                supportingText = {
+                                    Text(
+                                        "Toplam Fason Hizmet Bedeli: ${String.format(Locale.US, "%.2f €", state.totalServiceCost)} (${state.actualQty.toInt()} paket × ${state.unitServiceCost} €)",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ForestGreen
+                                    )
+                                },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
@@ -531,8 +538,8 @@ fun CompleteProductionDialog(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text("Paketlenmiş Net:", fontSize = 12.sp, color = Color.Gray)
-                                        Text("${state.netPackagedKg} kg", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                        Text("Üretilen Paket:", fontSize = 12.sp, color = Color.Gray)
+                                        Text("${state.actualQty.toInt()} Paket", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                     }
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),

@@ -2,6 +2,7 @@ package com.avatar.app.data.remote
 
 import com.avatar.app.data.model.CreateRecallRequest
 import com.avatar.app.data.model.CreateRecallResponse
+import com.avatar.app.data.model.LotItem
 import com.avatar.app.data.model.RecallItem
 import retrofit2.Response
 import retrofit2.http.Body
@@ -13,6 +14,9 @@ import retrofit2.http.Path
 interface RecallApiService {
     @GET("recalls")
     suspend fun getRecalls(): Response<List<RecallItem>>
+
+    @GET("recalls/recallable-lots")
+    suspend fun getRecallableLots(): Response<List<LotItem>>
 
     @POST("recalls")
     suspend fun initiateRecall(
