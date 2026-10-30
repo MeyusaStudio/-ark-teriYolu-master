@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
@@ -38,6 +39,7 @@ fun ProducerListingsManageScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
+    var editingListing by remember { mutableStateOf<ProducerListing?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(state.errorMessage, state.successMessage) {
@@ -127,7 +129,11 @@ fun ProducerListingsManageScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(state.myListings) { item ->
-                        ProducerListingCard(listing = item)
+                        ProducerListingCard(
+                            listing = item,
+                            onToggle = { viewModel.toggleProducerListing(item.id) },
+                            onEdit = { editingListing = item }
+                        )
                     }
                     item {
                         Spacer(modifier = Modifier.height(80.dp))
@@ -135,6 +141,18 @@ fun ProducerListingsManageScreen(
                 }
             }
         }
+    }
+
+    editingListing?.let { listing ->
+        EditProducerListingDialog(
+            listing = listing,
+            onDismiss = { editingListing = null },
+            onConfirm = { price, minQty, desc ->
+                viewModel.updateProducerListing(listing.id, price, minQty, desc) {
+                    editingListing = null
+                }
+            }
+        )
     }
 
     if (showCreateDialog) {
@@ -146,7 +164,11 @@ fun ProducerListingsManageScreen(
 }
 
 @Composable
-fun ProducerListingCard(listing: ProducerListing) {
+fun ProducerListingCard(
+    listing: ProducerListing,
+    onToggle: () -> Unit,
+    onEdit: () -> Unit
+) {
     val emoji = when (listing.productName.lowercase()) {
         "sucuk" -> "🌭"
         "salam" -> "🥩"
@@ -154,6 +176,7 @@ fun ProducerListingCard(listing: ProducerListing) {
         "pastırma", "pastirma" -> "🥓"
         else -> "🍽️"
     }
+    val isActive = listing.isCurrentlyActive
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -186,11 +209,11 @@ fun ProducerListingCard(listing: ProducerListing) {
 
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = Color(0xFFE8F5E9)
+                    color = if (isActive) Color(0xFFE8F5E9) else Color(0xFFF1F5F9)
                 ) {
                     Text(
-                        "Aktif İlan",
-                        color = ForestGreen,
+                        if (isActive) "● Yayında" else "○ Pasif",
+                        color = if (isActive) ForestGreen else Color.Gray,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -224,6 +247,123 @@ fun ProducerListingCard(listing: ProducerListing) {
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp
                     )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider(color = Color(0xFFF1F5F9))
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(
+                        checked = isActive,
+                        onCheckedChange = { onToggle() },
+                        modifier = Modifier.height(28.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        if (isActive) "Yayında" else "Pasif",
+                        fontSize = 11.sp,
+                        color = Color.Gray
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = onEdit,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Düzenle", fontSize = 11.sp)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditProducerListingDialog(
+    listing: ProducerListing,
+    onDismiss: () -> Unit,
+    onConfirm: (price: Double, minQty: Double?, desc: String?) -> Unit
+) {
+    var priceText by remember { mutableStateOf(listing.servicePrice.toString()) }
+    var minQtyText by remember { mutableStateOf((listing.minOrderQty ?: 1.0).toString()) }
+    var descText by remember { mutableStateOf(listing.description ?: "") }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.background,
+            modifier = Modifier.fillMaxWidth().padding(8.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("✏️ Fason İlanı Düzenle", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Kapat")
+                    }
+                }
+
+                Text(listing.productName, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+
+                OutlinedTextField(
+                    value = priceText,
+                    onValueChange = { priceText = it },
+                    label = { Text("Hizmet Ücreti (EUR / ${listing.serviceUnit})") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = minQtyText,
+                    onValueChange = { minQtyText = it },
+                    label = { Text("Min. Sipariş (kg)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = descText,
+                    onValueChange = { descText = it },
+                    label = { Text("Açıklama") },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                        Text("İptal")
+                    }
+                    Button(
+                        onClick = {
+                            val p = priceText.toDoubleOrNull() ?: listing.servicePrice
+                            val q = minQtyText.toDoubleOrNull()
+                            onConfirm(p, q, descText.ifBlank { null })
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                        modifier = Modifier.weight(1.5f)
+                    ) {
+                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Kaydet", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

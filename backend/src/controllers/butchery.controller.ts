@@ -292,7 +292,7 @@ export async function getButcheryById(req: AuthRequest, res: Response): Promise<
 
     const parts = await selectQuery(
       sequelize,
-      `SELECT bp.*, l.lot_number
+      `SELECT bp.*, l.lot_number, l.quantity as remaining_kg, l.status as lot_status
        FROM butchery_parts bp
        LEFT JOIN lots l ON bp.lot_id = l.id
        WHERE bp.butchery_operation_id = ?

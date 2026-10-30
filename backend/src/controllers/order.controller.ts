@@ -61,9 +61,11 @@ export async function createOrder(req: AuthRequest, res: Response): Promise<void
           }
         }
 
-        // Eğer lotId yoksa, alıcının (hayvancının) bu isimdeki hammaddelerinden lot bul
+        // Eğer lotId yoksa, alıcının (hayvancının) bu isimdeki hammaddelerinden veya et parçalarından lot bul
         if (!lotId) {
           const cleanMatName = (rm.material_type || '').split('-').pop()?.trim().toLowerCase() || '';
+
+          // A) Önce raw_materials tablosunda ara
           const userMat = await selectQuery<{ lot_id: number; unit_price: number }>(
             sequelize,
             `SELECT rm.lot_id, rm.unit_price FROM raw_materials rm 
@@ -75,6 +77,25 @@ export async function createOrder(req: AuthRequest, res: Response): Promise<void
           if (userMat.length > 0 && userMat[0].lot_id) {
             lotId = userMat[0].lot_id;
             if (!rm.unit_price) rm.unit_price = userMat[0].unit_price;
+          } else {
+            // B) Eğer bulunamadıysa hayvancının et parçalarında ara
+            const userMeat = await selectQuery<{ lot_id: number; unit_cost: number }>(
+              sequelize,
+              `SELECT bp.lot_id, bp.unit_cost
+               FROM butchery_parts bp
+               JOIN butchery_operations bo ON bp.butchery_operation_id = bo.id
+               JOIN lots l ON bp.lot_id = l.id
+               WHERE bo.operator_id = ?
+                 AND (LOWER(bp.part_name) LIKE ? OR LOWER(bo.animal_type) LIKE ?)
+                 AND l.quantity > 0
+               LIMIT 1`,
+              [req.user!.id, `%${cleanMatName}%`, `%${cleanMatName}%`],
+              t
+            );
+            if (userMeat.length > 0 && userMeat[0].lot_id) {
+              lotId = userMeat[0].lot_id;
+              if (!rm.unit_price) rm.unit_price = userMeat[0].unit_cost;
+            }
           }
         }
 
@@ -152,10 +173,13 @@ export async function getOrders(req: AuthRequest, res: Response): Promise<void> 
 
     const orders = await selectQuery(
       sequelize,
-      `SELECT o.*, bu.name as buyer_name, su.name as seller_name,
+      `SELECT o.*, 
+              COALESCE(o.actual_qty, po.actual_qty) as actual_qty,
+              bu.name as buyer_name, su.name as seller_name,
               su.phone as seller_phone, su.address as seller_address,
               pl.product_name
        FROM orders o
+       LEFT JOIN production_orders po ON po.order_id = o.id
        JOIN users bu ON o.buyer_id  = bu.id
        JOIN users su ON o.seller_id = su.id
        JOIN producer_listings pl ON o.listing_id = pl.id
@@ -173,10 +197,13 @@ export async function getOrderById(req: AuthRequest, res: Response): Promise<voi
   try {
     const orders = await selectQuery(
       sequelize,
-      `SELECT o.*, bu.name as buyer_name, su.name as seller_name,
+      `SELECT o.*, 
+              COALESCE(o.actual_qty, po.actual_qty) as actual_qty,
+              bu.name as buyer_name, su.name as seller_name,
               su.phone as seller_phone, su.address as seller_address,
               pl.product_name
        FROM orders o
+       LEFT JOIN production_orders po ON po.order_id = o.id
        JOIN users bu ON o.buyer_id  = bu.id
        JOIN users su ON o.seller_id = su.id
        JOIN producer_listings pl ON o.listing_id = pl.id
@@ -275,9 +302,18 @@ export async function updateOrderStatus(req: AuthRequest, res: Response): Promis
           t
         );
 
-        // Lot miktarını güncelle
+        // 1. Lot tablosundaki bakiyeyi ve durumu güncelle
         await sequelize.query(
-          'UPDATE lots SET quantity = GREATEST(0, quantity - ?) WHERE id = ?',
+          `UPDATE lots 
+           SET quantity = GREATEST(0, quantity - ?),
+               status = CASE WHEN quantity - ? <= 0.001 THEN 'consumed' ELSE status END
+           WHERE id = ?`,
+          { replacements: [rm.quantity, rm.quantity, rm.lot_id], transaction: t }
+        );
+
+        // 2. Hammadde stoğundaki (raw_materials) bakiyeyi de eşzamanlı olarak düşür
+        await sequelize.query(
+          'UPDATE raw_materials SET quantity = GREATEST(0, quantity - ?) WHERE lot_id = ?',
           { replacements: [rm.quantity, rm.lot_id], transaction: t }
         );
       }

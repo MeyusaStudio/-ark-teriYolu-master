@@ -6,6 +6,7 @@ import {
   UnorderedListOutlined, TagsOutlined, ForkOutlined, BellOutlined,
   LogoutOutlined, UserOutlined, WarningOutlined, AuditOutlined, InboxOutlined,
   CheckCircleOutlined, DollarCircleOutlined, BarChartOutlined, FileTextOutlined,
+  TeamOutlined, NotificationOutlined, SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useAuthStore } from '../../store/authStore';
@@ -31,6 +32,7 @@ const roleColors: Record<string, string> = {
   hayvanci: '#52c41a',
   sucukcu:  '#1890ff',
   market:   '#fa8c16',
+  admin:    '#722ed1',
 };
 
 export default function MainLayout() {
@@ -110,6 +112,8 @@ export default function MainLayout() {
             renderItem={(item) => {
               const isUnread = !item.is_read;
               const isQualityIssue = item.type === 'kalite_sorunu';
+              const isAdminMsg = item.type === 'admin_mesaj';
+              const isAdminAlert = item.type === 'admin_uyari';
 
               return (
                 <List.Item
@@ -120,14 +124,18 @@ export default function MainLayout() {
                     borderRadius: 8,
                     marginBottom: 6,
                     cursor: 'pointer',
-                    background: isUnread ? (isQualityIssue ? '#fff1f0' : '#f0f5ff') : '#fafafa',
-                    border: `1px solid ${isUnread ? (isQualityIssue ? '#ffa39e' : '#adc6ff') : '#f0f0f0'}`,
+                    background: isUnread ? (isQualityIssue || isAdminAlert ? '#fff1f0' : isAdminMsg ? '#f9f0ff' : '#f0f5ff') : '#fafafa',
+                    border: `1px solid ${isUnread ? (isQualityIssue || isAdminAlert ? '#ffa39e' : isAdminMsg ? '#d3adf7' : '#adc6ff') : '#f0f0f0'}`,
                     display: 'block',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                     {isQualityIssue ? (
                       <WarningOutlined style={{ color: '#ff4d4f', fontSize: 16, marginTop: 2 }} />
+                    ) : isAdminAlert ? (
+                      <SafetyCertificateOutlined style={{ color: '#f5222d', fontSize: 16, marginTop: 2 }} />
+                    ) : isAdminMsg ? (
+                      <NotificationOutlined style={{ color: '#722ed1', fontSize: 16, marginTop: 2 }} />
                     ) : item.type === 'satis' ? (
                       <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 16, marginTop: 2 }} />
                     ) : item.type === 'siparis' ? (
@@ -137,11 +145,15 @@ export default function MainLayout() {
                     )}
 
                     <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Text strong style={{ fontSize: 13, color: isQualityIssue ? '#cf1322' : undefined }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text strong style={{ fontSize: 13, color: isQualityIssue || isAdminAlert ? '#cf1322' : undefined }}>
                           {item.title}
                         </Text>
-                        {isUnread && <Tag color={isQualityIssue ? 'error' : 'processing'} style={{ fontSize: 10, lineHeight: '16px' }}>{t('notifications.new')}</Tag>}
+                        <Space size={4}>
+                          {isAdminMsg && <Tag color="purple" style={{ fontSize: 10, lineHeight: '16px' }}>Yönetici Mesajı</Tag>}
+                          {isAdminAlert && <Tag color="red" style={{ fontSize: 10, lineHeight: '16px' }}>Yönetici Uyarısı</Tag>}
+                          {isUnread && <Tag color={isQualityIssue || isAdminAlert ? 'error' : 'processing'} style={{ fontSize: 10, lineHeight: '16px' }}>{t('notifications.new')}</Tag>}
+                        </Space>
                       </div>
 
                       <Text style={{ fontSize: 12, display: 'block', margin: '4px 0', color: '#595959' }}>
@@ -272,7 +284,11 @@ function getMenuItems(role: string, t: (key: string) => string) {
     { key: '/purchases',       icon: <ShoppingCartOutlined />,  label: t('nav.purchases') },
   ];
 
-  const roleMenus: Record<string, typeof dashboard> = { hayvanci, sucukcu, market };
+  const admin = [
+    { key: '/admin/users', icon: <TeamOutlined />, label: t('nav.adminUsers') || 'Kullanıcı Yönetimi' },
+  ];
+
+  const roleMenus: Record<string, typeof dashboard> = { hayvanci, sucukcu, market, admin };
   const common = [
     { key: '/invoices', icon: <FileTextOutlined />, label: t('nav.invoices') },
     { key: '/reports',  icon: <BarChartOutlined />, label: t('nav.reports') },

@@ -1,6 +1,7 @@
 package com.avatar.app.ui.rawmaterials
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -9,11 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +25,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.avatar.app.data.model.RawMaterial
 import com.avatar.app.data.model.RawMaterialPresets
+import com.avatar.app.ui.components.SyncStatusBanner
 import com.avatar.app.ui.theme.ForestGreen
 import java.util.Locale
 
@@ -40,6 +38,8 @@ fun RawMaterialsScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var itemToDelete by remember { mutableStateOf<RawMaterial?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val apiClient = remember { com.avatar.app.data.remote.ApiClient(context) }
 
     LaunchedEffect(state.errorMessage, state.successMessage) {
         state.errorMessage?.let {
@@ -64,7 +64,7 @@ fun RawMaterialsScreen(
                             fontSize = 17.sp
                         )
                         Text(
-                            "Et, Baharat, Bağırsak ve Malzeme Lotları",
+                            "Baharat, Bağırsak ve Malzeme Lotları",
                             fontSize = 11.sp,
                             color = Color.Gray
                         )
@@ -95,6 +95,11 @@ fun RawMaterialsScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            SyncStatusBanner(
+                syncState = state.syncState,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp)
+            )
+
             // Kategori Filtre Çipleri
             val categories = listOf("Tümü", "Et", "Kuru/Toz", "Sıvı", "Bağırsak", "Süt/Yumurta", "Sebze/Meyve")
             Row(
@@ -272,23 +277,32 @@ fun RawMaterialCard(
                     Text(
                         "${material.quantity} ${material.unit}",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
+                        fontSize = 13.sp
+                    )
+                }
+                Column {
+                    Text("SKT", fontSize = 11.sp, color = Color.Gray)
+                    Text(
+                        material.expiryDate ?: "-",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                        color = if (material.expiryDate != null) ForestGreen else Color.Gray
                     )
                 }
                 Column {
                     Text("Birim Fiyat", fontSize = 11.sp, color = Color.Gray)
                     Text(
-                        String.format(Locale.US, "%.2f €", material.unitPrice),
+                        String.format(Locale.US, "%.2f %s", material.unitPrice, material.currency ?: "€"),
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp
+                        fontSize = 12.sp
                     )
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Toplam Tutar", fontSize = 11.sp, color = Color.Gray)
                     Text(
-                        String.format(Locale.US, "%.2f €", material.totalCost),
+                        String.format(Locale.US, "%.2f %s", material.totalCost, material.currency ?: "€"),
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         color = ForestGreen
                     )
                 }
@@ -303,18 +317,34 @@ fun RawMaterialCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color(0xFFE0F2FE))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        material.lotNumber ?: "Lot atanmadı",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF0369A1)
-                    )
+                if (material.isOfflinePending) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFFFEF3C7))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            "💾 Çevrimdışı (${material.lotNumber ?: "Bekliyor"})",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFB45309)
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFFE0F2FE))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            material.lotNumber ?: "Lot atanmadı",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF0369A1)
+                        )
+                    }
                 }
 
                 Box(
@@ -454,28 +484,38 @@ fun AddRawMaterialDialog(
                     }
 
                     item {
+                        OutlinedTextField(
+                            value = if (state.quantity > 0) state.quantity.toString() else "",
+                            onValueChange = {
+                                val q = it.toDoubleOrNull() ?: 0.0
+                                viewModel.updateForm(quantity = q)
+                            },
+                            label = { Text("Miktar (kg)", fontSize = 12.sp) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    }
+
+                    // Para Birimi Seçimi
+                    item {
+                        Text("Para Birimi Seçiniz", fontSize = 12.sp, color = Color.Gray)
+                        Spacer(modifier = Modifier.height(4.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            OutlinedTextField(
-                                value = if (state.quantity > 0) state.quantity.toString() else "",
-                                onValueChange = {
-                                    val q = it.toDoubleOrNull() ?: 0.0
-                                    viewModel.updateForm(quantity = q)
-                                },
-                                label = { Text("Miktar", fontSize = 12.sp) },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                modifier = Modifier.weight(1.2f),
-                                singleLine = true
-                            )
-                            OutlinedTextField(
-                                value = state.unit,
-                                onValueChange = { viewModel.updateForm(unit = it) },
-                                label = { Text("Birim", fontSize = 12.sp) },
-                                modifier = Modifier.weight(0.8f),
-                                singleLine = true
-                            )
+                            listOf("EURO" to "€", "TL" to "₺", "DOLAR" to "$", "GBP" to "£").forEach { (curr, sym) ->
+                                val isSelected = state.currency.equals(curr, ignoreCase = true) ||
+                                        (curr == "EURO" && state.currency == "EUR") ||
+                                        (curr == "DOLAR" && state.currency == "USD") ||
+                                        (curr == "TL" && state.currency == "TRY")
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { viewModel.updateForm(currency = curr) },
+                                    label = { Text("$curr ($sym)", fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) }
+                                )
+                            }
                         }
                     }
 
@@ -490,7 +530,7 @@ fun AddRawMaterialDialog(
                                     val p = it.toDoubleOrNull() ?: 0.0
                                     viewModel.updateForm(unitPrice = p)
                                 },
-                                label = { Text("Birim Fiyat (€)", fontSize = 12.sp) },
+                                label = { Text("Birim Fiyat (${state.currency})", fontSize = 12.sp) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                 modifier = Modifier.weight(1f),
                                 singleLine = true
@@ -503,6 +543,17 @@ fun AddRawMaterialDialog(
                                 singleLine = true
                             )
                         }
+                    }
+
+                    item {
+                        OutlinedTextField(
+                            value = state.expiryDate ?: "",
+                            onValueChange = { viewModel.updateForm(expiryDate = it) },
+                            label = { Text("Son Kullanma Tarihi (SKT - İsteğe Bağlı)", fontSize = 12.sp) },
+                            placeholder = { Text("YYYY-AA-GG (Örn: 2026-12-31)", fontSize = 12.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
                     }
 
                     item {
@@ -520,7 +571,7 @@ fun AddRawMaterialDialog(
                             ) {
                                 Text("Hesaplanan Toplam Maliyet:", fontSize = 13.sp, color = Color.DarkGray)
                                 Text(
-                                    String.format(Locale.US, "%.2f €", state.totalCost),
+                                    String.format(Locale.US, "%.2f %s", state.totalCost, state.currency),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 16.sp,
                                     color = ForestGreen

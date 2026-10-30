@@ -4,7 +4,10 @@ import com.avatar.app.data.model.*
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
+import retrofit2.http.Path
 
 interface ListingApiService {
     @GET("listings/producer")
@@ -18,6 +21,18 @@ interface ListingApiService {
         @Body request: CreateProducerListingRequest
     ): Response<Map<String, Any>>
 
+    @PUT("listings/producer/{id}")
+    suspend fun updateProducerListing(
+        @Path("id") id: Int,
+        @Body request: Map<String, Any?>
+    ): Response<Map<String, Any>>
+
+    @POST("listings/producer/{id}/toggle")
+    suspend fun toggleProducerListing(
+        @Path("id") id: Int,
+        @Body body: Map<String, String> = emptyMap()
+    ): Response<Map<String, Any>>
+
     @GET("listings/farmer")
     suspend fun getFarmerListings(): Response<List<FarmerListing>>
 
@@ -29,14 +44,15 @@ interface ListingApiService {
         @Body request: CreateFarmerListingRequest
     ): Response<Map<String, Any>>
 
-    @retrofit2.http.PUT("listings/farmer/{id}")
+    @PUT("listings/farmer/{id}")
     suspend fun updateFarmerListing(
-        @retrofit2.http.Path("id") id: Int,
+        @Path("id") id: Int,
         @Body request: Map<String, Any?>
     ): Response<Map<String, Any>>
 
-    @retrofit2.http.PATCH("listings/farmer/{id}/toggle")
+    @POST("listings/farmer/{id}/toggle")
     suspend fun toggleFarmerListing(
-        @retrofit2.http.Path("id") id: Int
+        @Path("id") id: Int,
+        @Body body: Map<String, String> = emptyMap()
     ): Response<Map<String, Any>>
 }

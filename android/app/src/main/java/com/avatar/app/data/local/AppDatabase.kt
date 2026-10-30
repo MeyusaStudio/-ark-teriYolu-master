@@ -4,16 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.avatar.app.data.local.dao.ButcheryDao
-import com.avatar.app.data.local.dao.LotDao
-import com.avatar.app.data.local.dao.RawMaterialDao
-import com.avatar.app.data.local.dao.SaleDao
-import com.avatar.app.data.local.dao.UserDao
-import com.avatar.app.data.local.entity.ButcheryOperationEntity
-import com.avatar.app.data.local.entity.LotEntity
-import com.avatar.app.data.local.entity.RawMaterialEntity
-import com.avatar.app.data.local.entity.SaleEntity
-import com.avatar.app.data.local.entity.UserEntity
+import com.avatar.app.data.local.dao.*
+import com.avatar.app.data.local.entity.*
 
 @Database(
     entities = [
@@ -21,9 +13,11 @@ import com.avatar.app.data.local.entity.UserEntity
         LotEntity::class,
         SaleEntity::class,
         ButcheryOperationEntity::class,
-        RawMaterialEntity::class
+        RawMaterialEntity::class,
+        OfflineButcheryEntity::class,
+        OfflineRawMaterialEntity::class
     ],
-    version = 3,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -32,6 +26,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun saleDao(): SaleDao
     abstract fun butcheryDao(): ButcheryDao
     abstract fun rawMaterialDao(): RawMaterialDao
+    abstract fun offlineButcheryDao(): OfflineButcheryDao
+    abstract fun offlineRawMaterialDao(): OfflineRawMaterialDao
 
     companion object {
         @Volatile

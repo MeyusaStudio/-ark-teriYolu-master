@@ -14,7 +14,7 @@ export async function initiateRecall(req: AuthRequest, res: Response): Promise<v
 
   const t = await sequelize.transaction();
   try {
-    const lots = await selectQuery<{ id: number; quantity: number; unit: string; owner_id: number }>(
+    const lots = await selectQuery<{ id: number; quantity: number; unit: string; owner_id: number; status: string }>(
       sequelize,
       'SELECT * FROM lots WHERE id = ? AND owner_id = ?',
       [lotId, req.user!.id],
@@ -24,6 +24,24 @@ export async function initiateRecall(req: AuthRequest, res: Response): Promise<v
     if (lots.length === 0) {
       await t.rollback();
       res.status(404).json({ error: 'Lot bulunamadı veya yetkiniz yok' });
+      return;
+    }
+
+    if (lots[0].status === 'recalled') {
+      await t.rollback();
+      res.status(400).json({ error: 'Bu lot zaten geri çağrılmış ve bloke edilmiştir.' });
+      return;
+    }
+
+    const existingRecall = await selectQuery<{ id: number }>(
+      sequelize,
+      "SELECT id FROM recalls WHERE lot_id = ? AND status = 'aktif'",
+      [lotId],
+      t
+    );
+    if (existingRecall.length > 0) {
+      await t.rollback();
+      res.status(400).json({ error: 'Bu lot için zaten aktif bir geri çağırma işlemi bulunmaktadır.' });
       return;
     }
 
@@ -58,7 +76,31 @@ export async function initiateRecall(req: AuthRequest, res: Response): Promise<v
         [recallId, purchase.market_id, purchase.id, purchase.quantity, purchase.unit],
         t
       );
+
+      // Etkilenen marketlere acil geri çağırma bildirimi gönder
+      await insertQuery(
+        sequelize,
+        `INSERT INTO notifications (user_id, type, title, message, reference_type, reference_id)
+         VALUES (?, 'geri_cagirma', 'ACİL: Ürün Geri Çağırma (Recall)', ?, 'recall', ?)`,
+        [purchase.market_id, `Satın aldığınız ürün için geri çağırma başlatıldı. Gerekçe: ${reason}. Lütfen ürünü reyonlardan çekiniz.`, recallId],
+        t
+      );
     }
+
+    // Bu lota ait TÜM market satışlarının durumunu 'geri_cagrildi' yap (tek şikayetle tüm market satışları geri çağrılır)
+    const purchaseIds = purchases.map(p => p.id);
+    if (purchaseIds.length > 0) {
+      await sequelize.query(
+        `UPDATE market_purchases SET status = 'geri_cagrildi' WHERE id IN (?)`,
+        { replacements: [purchaseIds], transaction: t }
+      );
+    }
+
+    // Bu lotla ilgili kalite sorunu bildirimlerini okundu/işlendi yap
+    await sequelize.query(
+      `UPDATE notifications SET is_read = 1 WHERE reference_id = ? AND type = 'kalite_sorunu'`,
+      { replacements: [lotId], transaction: t }
+    );
 
     // Etkilenen mamul lotlarını da bul ve bloke/recalled yap
     const affectedFinishedLots = await selectQuery<{ lot_id: number }>(

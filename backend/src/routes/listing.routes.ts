@@ -81,17 +81,20 @@ router.put('/producer/:id', authorize('sucukcu'), async (req: AuthRequest, res) 
 });
 
 // Aktif / Pasif toggle
-router.patch('/producer/:id/toggle', authorize('sucukcu'), async (req: AuthRequest, res) => {
+const toggleProducer = async (req: AuthRequest, res: any) => {
   try {
     await sequelize.query(
-      `UPDATE producer_listings SET is_active = NOT is_active, updated_at = NOW() WHERE id = ? AND producer_id = ?`,
+      `UPDATE producer_listings SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END, updated_at = NOW() WHERE id = ? AND producer_id = ?`,
       { replacements: [req.params.id, req.user!.id] }
     );
     res.json({ message: 'İlan durumu güncellendi' });
-  } catch {
+  } catch (e) {
+    console.error('Producer ilan toggle hatası:', e);
     res.status(500).json({ error: 'Durum güncellenemedi' });
   }
-});
+};
+router.patch('/producer/:id/toggle', authorize('sucukcu'), toggleProducer);
+router.post('/producer/:id/toggle',  authorize('sucukcu'), toggleProducer);
 
 // İlan sil
 router.delete('/producer/:id', authorize('sucukcu'), async (req: AuthRequest, res) => {
@@ -182,37 +185,42 @@ router.post('/farmer', authorize('hayvanci'), async (req: AuthRequest, res) => {
 
 // Hayvancı ilanı güncelle
 router.put('/farmer/:id', authorize('hayvanci'), async (req: AuthRequest, res) => {
-  const { unit_price, quantity, currency, description } = req.body;
+  const { unit_price, unitPrice, quantity, currency, description } = req.body;
+  const price = unit_price !== undefined ? unit_price : unitPrice;
   const curr = currency ? String(currency).trim().toUpperCase() : null;
   try {
     await sequelize.query(
       `UPDATE farmer_listings 
-       SET unit_price = ?, 
+       SET unit_price = COALESCE(?, unit_price), 
            currency = COALESCE(?, currency),
-           quantity = ?, 
-           description = ?, 
+           quantity = COALESCE(?, quantity), 
+           description = COALESCE(?, description), 
            updated_at = NOW()
        WHERE id = ? AND farmer_id = ?`,
-      { replacements: [unit_price, curr, quantity, description || null, req.params.id, req.user!.id] }
+      { replacements: [price, curr, quantity, description !== undefined ? description : null, req.params.id, req.user!.id] }
     );
     res.json({ message: 'İlan güncellendi' });
-  } catch {
+  } catch (e) {
+    console.error('İlan güncelleme hatası:', e);
     res.status(500).json({ error: 'İlan güncellenemedi' });
   }
 });
 
 // Hayvancı ilanı aktif/pasif toggle
-router.patch('/farmer/:id/toggle', authorize('hayvanci'), async (req: AuthRequest, res) => {
+const toggleFarmer = async (req: AuthRequest, res: any) => {
   try {
     await sequelize.query(
-      `UPDATE farmer_listings SET is_active = NOT is_active, updated_at = NOW()
+      `UPDATE farmer_listings SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END, updated_at = NOW()
        WHERE id = ? AND farmer_id = ?`,
       { replacements: [req.params.id, req.user!.id] }
     );
     res.json({ message: 'İlan durumu güncellendi' });
-  } catch {
+  } catch (e) {
+    console.error('İlan toggle hatası:', e);
     res.status(500).json({ error: 'Durum güncellenemedi' });
   }
-});
+};
+router.patch('/farmer/:id/toggle', authorize('hayvanci'), toggleFarmer);
+router.post('/farmer/:id/toggle',  authorize('hayvanci'), toggleFarmer);
 
 export default router;

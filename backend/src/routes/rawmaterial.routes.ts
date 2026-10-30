@@ -13,7 +13,10 @@ router.get('/', async (req: AuthRequest, res) => {
   try {
     const materials = await selectQuery(
       sequelize,
-      `SELECT rm.*, l.lot_number, l.status as lot_status
+      `SELECT rm.id, rm.owner_id, rm.lot_id, rm.material_type,
+              COALESCE(l.quantity, rm.quantity) as quantity,
+              rm.unit, rm.unit_price, rm.total_cost, rm.currency,
+              l.lot_number, l.status as lot_status, l.expiry_date, l.supplier_name, rm.created_at
        FROM raw_materials rm
        JOIN lots l ON rm.lot_id = l.id
        WHERE rm.owner_id = ?
@@ -30,9 +33,10 @@ router.get('/', async (req: AuthRequest, res) => {
 router.post('/', async (req: AuthRequest, res) => {
   const { material_type, quantity, unit, unit_price, currency, supplier_name, expiry_date } = req.body;
   const curr = currency ? String(currency).trim().toUpperCase() : 'EUR';
+  const cleanUnit = (unit && String(unit).trim()) ? String(unit).trim() : 'kg';
 
-  if (!material_type || !quantity || !unit || !unit_price) {
-    res.status(400).json({ error: 'material_type, quantity, unit, unit_price zorunludur' });
+  if (!material_type || !quantity || !unit_price) {
+    res.status(400).json({ error: 'material_type, quantity, unit_price zorunludur' });
     return;
   }
 
@@ -55,7 +59,7 @@ router.post('/', async (req: AuthRequest, res) => {
       sequelize,
       `INSERT INTO lots (lot_number, lot_type, owner_id, quantity, unit, unit_cost, total_cost, currency, supplier_name, expiry_date, status)
        VALUES (?, 'hammadde', ?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
-      [lotNumber, req.user!.id, quantity, unit, unit_price, totalCost, curr, supplier_name || null, expiry_date || null],
+      [lotNumber, req.user!.id, quantity, cleanUnit, unit_price, totalCost, curr, supplier_name || null, expiry_date || null],
       t
     );
 
@@ -64,7 +68,7 @@ router.post('/', async (req: AuthRequest, res) => {
       sequelize,
       `INSERT INTO raw_materials (owner_id, lot_id, material_type, quantity, unit, unit_price, total_cost, currency)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user!.id, lotId, material_type, quantity, unit, unit_price, totalCost, curr],
+      [req.user!.id, lotId, material_type, quantity, cleanUnit, unit_price, totalCost, curr],
       t
     );
 
@@ -73,7 +77,7 @@ router.post('/', async (req: AuthRequest, res) => {
       sequelize,
       `INSERT INTO lot_movements (lot_id, movement_type, quantity, unit, reference_type, reference_id, to_user_id)
        VALUES (?, 'giris', ?, ?, 'raw_material', ?, ?)`,
-      [lotId, quantity, unit, rmId, req.user!.id],
+      [lotId, quantity, cleanUnit, rmId, req.user!.id],
       t
     );
 

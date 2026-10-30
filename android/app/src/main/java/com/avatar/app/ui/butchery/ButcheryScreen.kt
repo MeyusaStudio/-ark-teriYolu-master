@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.avatar.app.data.model.ButcheryRecord
+import com.avatar.app.ui.components.SyncStatusBanner
 import com.avatar.app.ui.theme.ForestGreen
 import java.util.Locale
 
@@ -81,54 +82,65 @@ fun ButcheryScreen(
             )
         }
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            if (state.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center),
-                    color = ForestGreen
-                )
-            } else if (state.operations.isEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text("🐑", fontSize = 48.sp)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        "Henüz parçalama kaydı bulunmuyor",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
+            SyncStatusBanner(
+                syncState = state.syncState,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                if (state.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center),
+                        color = ForestGreen
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Sağ alttaki 'Yeni Parçalama' butonuna tıklayarak ilk hayvan parçalama ve lot oluşturma işlemini başlatabilirsiniz.",
-                        fontSize = 13.sp,
-                        color = Color.Gray,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(state.operations) { op ->
-                        ButcheryOperationCard(
-                            record = op,
-                            onViewDetail = { viewModel.loadOperationDetail(op) }
+                } else if (state.operations.isEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text("🐑", fontSize = 48.sp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            "Henüz parçalama kaydı bulunmuyor",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Sağ alttaki 'Yeni Parçalama' butonuna tıklayarak ilk hayvan parçalama ve lot oluşturma işlemini başlatabilirsiniz.",
+                            fontSize = 13.sp,
+                            color = Color.Gray,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                     }
-                    item {
-                        Spacer(modifier = Modifier.height(80.dp))
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 14.dp, vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(state.operations) { op ->
+                            ButcheryOperationCard(
+                                record = op,
+                                onViewDetail = { viewModel.loadOperationDetail(op) }
+                            )
+                        }
+                        item {
+                            Spacer(modifier = Modifier.height(80.dp))
+                        }
                     }
                 }
             }
@@ -180,11 +192,27 @@ fun ButcheryOperationCard(
                     Text(animalEmoji, fontSize = 22.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
-                        Text(
-                            "${record.animalEarTag ?: "Küpe Belirtilmedi"} (#${record.id})",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                "${record.animalEarTag ?: "Küpe Belirtilmedi"} (#${if (record.isOfflinePending) "SQLite" else record.id.toString()})",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            if (record.isOfflinePending) {
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = Color(0xFFFEF3C7)
+                                ) {
+                                    Text(
+                                        "💾 Çevrimdışı",
+                                        color = Color(0xFFB45309),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
                         Text(record.operationDate, fontSize = 11.sp, color = Color.Gray)
                     }
                 }

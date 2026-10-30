@@ -14,7 +14,9 @@ data class RawMaterial(
     val currency: String? = "EUR",
     @SerializedName("lot_number") val lotNumber: String? = null,
     @SerializedName("lot_status") val lotStatus: String? = "active",
-    @SerializedName("created_at") val createdAt: String? = null
+    @SerializedName("expiry_date") val expiryDate: String? = null,
+    @SerializedName("created_at") val createdAt: String? = null,
+    val isOfflinePending: Boolean = false
 ) {
     fun isMeat(): Boolean {
         val norm = materialType.lowercase().trim()
@@ -69,19 +71,17 @@ data class RawMaterialPreset(
 
 object RawMaterialPresets {
     val ITEMS = listOf(
-        RawMaterialPreset("Dana Karkas / But", "kg", "Et", 9.50),
-        RawMaterialPreset("Kuzu Karkas / Parça", "kg", "Et", 11.50),
         RawMaterialPreset("Tuz", "kg", "Kuru/Toz", 0.50),
         RawMaterialPreset("Baharat", "kg", "Kuru/Toz", 12.00),
         RawMaterialPreset("Çemen", "kg", "Kuru/Toz", 6.50),
         RawMaterialPreset("Sarımsak", "kg", "Kuru/Toz", 4.00),
         RawMaterialPreset("Jelatin", "kg", "Kuru/Toz", 15.00),
-        RawMaterialPreset("Yağ", "lt", "Sıvı", 3.50),
-        RawMaterialPreset("İlikli Kemik Suyu", "lt", "Sıvı", 5.00),
-        RawMaterialPreset("Kırmızı Pancar Suyu", "lt", "Sıvı", 4.50),
+        RawMaterialPreset("Yağ", "kg", "Sıvı", 3.50),
+        RawMaterialPreset("İlikli Kemik Suyu", "kg", "Sıvı", 5.00),
+        RawMaterialPreset("Kırmızı Pancar Suyu", "kg", "Sıvı", 4.50),
         RawMaterialPreset("Salça", "kg", "Sebze/Meyve", 2.80),
         RawMaterialPreset("Yoğurt", "kg", "Süt/Yumurta", 1.80),
-        RawMaterialPreset("Yumurta Akı", "lt", "Süt/Yumurta", 3.00),
+        RawMaterialPreset("Yumurta Akı", "kg", "Süt/Yumurta", 3.00),
         RawMaterialPreset("Bağırsak", "kg", "Bağırsak", 8.50),
         RawMaterialPreset("İnek Bağırsağı", "kg", "Bağırsak", 8.00),
         RawMaterialPreset("Koyun Bağırsağı", "kg", "Bağırsak", 9.50)

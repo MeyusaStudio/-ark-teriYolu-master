@@ -2,6 +2,7 @@ package com.avatar.app.ui.lots
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,6 +11,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -22,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.avatar.app.data.model.AnimalLotGroup
 import com.avatar.app.data.model.LotItem
 import com.avatar.app.ui.theme.ForestGreen
 import com.avatar.app.ui.theme.PrimaryBlue
@@ -164,10 +168,220 @@ fun LotsScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 14.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(state.filteredLots, key = { it.id }) { lot ->
-                            LotCard(lot = lot)
+                        // 1. Hayvan Bazında Gruplandırılmış Kesim & Parça Lotları
+                        if (state.animalGroups.isNotEmpty()) {
+                            item {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 4.dp, bottom = 2.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "🥩 Hayvan Kesim ve Parçaları",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = ForestGreen
+                                    )
+                                    Text(
+                                        "${state.animalGroups.size} Hayvan",
+                                        fontSize = 12.sp,
+                                        color = Color.Gray
+                                    )
+                                }
+                            }
+                            items(state.animalGroups, key = { it.earTag }) { group ->
+                                AnimalGroupCard(group = group)
+                            }
+                        }
+
+                        // 2. Diğer Lotlar (Mamul & Hammadde)
+                        if (state.otherLots.isNotEmpty()) {
+                            item {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp, bottom = 2.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "📦 Diğer Lotlar (Mamul & Hammadde)",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = Color(0xFF334155)
+                                    )
+                                    Text(
+                                        "${state.otherLots.size} Lot",
+                                        fontSize = 12.sp,
+                                        color = Color.Gray
+                                    )
+                                }
+                            }
+                            items(state.otherLots, key = { it.id }) { lot ->
+                                LotCard(lot = lot)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun getAnimalEmoji(animalType: String?): String {
+    val norm = (animalType ?: "").lowercase()
+    return when {
+        norm.contains("inek") || norm.contains("dana") || norm.contains("sığır") -> "🐄"
+        norm.contains("koyun") || norm.contains("kuzu") || norm.contains("keçi") -> "🐑"
+        norm.contains("tavuk") || norm.contains("piliç") -> "🐔"
+        else -> "🥩"
+    }
+}
+
+@Composable
+fun AnimalGroupCard(group: AnimalLotGroup) {
+    var expanded by remember { mutableStateOf(true) }
+    val emoji = getAnimalEmoji(group.animalType)
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Başlık: Hayvan Küpe Numarası ve Özet
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFFDCFCE7)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(emoji, fontSize = 22.sp)
+                    }
+
+                    Column {
+                        Text(
+                            group.earTag,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = ForestGreen
+                        )
+                        Text(
+                            "${group.animalType ?: "Hayvan"} · Kesim: ${group.butcheryDate?.take(10) ?: "-"}",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            "${String.format(Locale.US, "%.2f", group.totalKg)} kg",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = ForestGreen
+                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFFEFF6FF))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                "${group.parts.size} Parça",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = PrimaryBlue
+                            )
+                        }
+                    }
+
+                    Icon(
+                        if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (expanded) "Kapat" else "Aç",
+                        tint = Color.Gray
+                    )
+                }
+            }
+
+            // Açılır Parça Detayları
+            if (expanded) {
+                HorizontalDivider(color = Color(0xFFF1F5F9))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF8FAFC))
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    group.parts.forEach { part ->
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        part.displayName,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    )
+                                    Text(
+                                        part.lot_number,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = PrimaryBlue
+                                    )
+                                }
+
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        "${String.format(Locale.US, "%.2f", part.quantity)} ${part.unit}",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = ForestGreen
+                                    )
+                                    if (part.unit_cost != null && part.unit_cost > 0) {
+                                        Text(
+                                            "${String.format(Locale.US, "%.2f", part.unit_cost)} ${part.currency}/kg",
+                                            fontSize = 11.sp,
+                                            color = Color(0xFFB45309)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }

@@ -34,13 +34,13 @@ data class FarmerListingsUiState(
         }
 
     val activeCount: Int
-        get() = listings.count { it.isActive == true || it.isActive == 1 || it.isActive == "1" }
+        get() = listings.count { it.isCurrentlyActive }
 
     val passiveCount: Int
         get() = listings.size - activeCount
 
     val totalValue: Double
-        get() = listings.filter { it.isActive == true || it.isActive == 1 || it.isActive == "1" }
+        get() = listings.filter { it.isCurrentlyActive }
             .sumOf { it.quantity * it.unitPrice }
 }
 

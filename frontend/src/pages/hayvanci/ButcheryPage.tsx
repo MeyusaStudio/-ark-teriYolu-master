@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Table, Button, Modal, DatePicker, InputNumber,
   Typography, Tag, Descriptions, Divider,
-  Space, Spin, App, Input, Radio, Card, Row, Col, Collapse,
+  Space, Spin, App, Input, Radio, Card, Row, Col, Collapse, Alert,
 } from 'antd';
 import {
   ScissorOutlined, PlusOutlined, EyeOutlined, CheckCircleFilled,
@@ -268,6 +268,39 @@ export default function ButcheryPage() {
     message.info('351.00 € ek masraflı maliyet senaryosu dolduruldu!');
   }
 
+  // ── Yapay Zeka ile Otomatik Doldurma ────────────────────────────────────
+  async function fillWithAi() {
+    if (!selectedType) return;
+    setMlLoading(true);
+    try {
+      const { data } = await mlService.predictButchery({
+        animal_type:     selectedType.key,
+        entry_weight_kg: inputWeightKg || (selectedType.key === 'koyun' ? 25.0 : 350.0),
+        purchase_cost:   purchaseCost || 0,
+      });
+      setMlResult(data);
+
+      if (data && data.parts && Array.isArray(data.parts)) {
+        const updated = selectedType.parts.map(pName => {
+          const match = data.parts.find((mp: any) =>
+            mp.part_name.toLowerCase().includes(pName.toLowerCase()) ||
+            pName.toLowerCase().includes(mp.part_name.toLowerCase())
+          );
+          return {
+            part_name: pName,
+            weight_kg: match ? parseFloat(Number(match.predicted_weight_kg).toFixed(2)) : null,
+          };
+        });
+        setPartWeights(updated);
+        message.success('🤖 Parça ağırlıkları yapay zeka tahmini ile başarıyla dolduruldu!');
+      }
+    } catch {
+      message.error('Yapay zeka tahmini alınamadı');
+    } finally {
+      setMlLoading(false);
+    }
+  }
+
   // ── Canlı Ağırlık ve Maliyet Dağıtım Hesaplamaları ───────────────────────────
   const totalOutputKg = useMemo(() => {
     return partWeights.reduce((s, p) => s + (p.weight_kg || 0), 0);
@@ -344,6 +377,11 @@ export default function ButcheryPage() {
 
     if (!purchaseCost || purchaseCost <= 0) {
       message.error('Lütfen toplam alış maliyetini giriniz.');
+      return;
+    }
+
+    if (totalOutputKg > (inputWeightKg || 0)) {
+      message.error(`Parçaların toplam ağırlığı (${totalOutputKg.toFixed(2)} kg), girilen toplam karkas ağırlığından (${inputWeightKg} kg) fazla olamaz!`);
       return;
     }
 
@@ -566,7 +604,16 @@ export default function ButcheryPage() {
                 {t('butchery.quickScenarioDesc')}
               </Text>
             </div>
-            <Space>
+            <Space wrap>
+              <Button
+                size="small"
+                style={{ borderColor: '#722ed1', color: '#722ed1', fontWeight: 600 }}
+                icon={<RobotOutlined />}
+                loading={mlLoading}
+                onClick={fillWithAi}
+              >
+                Yapay Zeka ile Doldur
+              </Button>
               <Button
                 size="small"
                 type="primary"
@@ -827,12 +874,22 @@ export default function ButcheryPage() {
             ]}
           />
 
+          {totalOutputKg > (inputWeightKg || 0) && (
+            <Alert
+              type="error"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="Ağırlık Aşımı Hatası"
+              description={`Parçaların toplam ağırlığı (${totalOutputKg.toFixed(2)} kg), girilen toplam karkas ağırlığından (${inputWeightKg} kg) fazla olamaz! Lütfen parça ağırlıklarını azaltınız.`}
+            />
+          )}
+
           <Button
             type="primary"
             block
             size="large"
             loading={submitting}
-            disabled={totalOutputKg <= 0 || !inputWeightKg || !purchaseCost}
+            disabled={totalOutputKg <= 0 || !inputWeightKg || !purchaseCost || totalOutputKg > (inputWeightKg || 0)}
             onClick={onSubmit}
             style={{ borderRadius: 8 }}
           >
@@ -901,7 +958,26 @@ export default function ButcheryPage() {
                 columns={[
                   { title: t('butchery.partName'), dataIndex: 'part_name', key: 'part_name', render: (v: string) => <strong>{getTranslatedPart(v, t)}</strong> },
                   { title: t('common.lotNumber'), dataIndex: 'lot_number', key: 'lot_number', render: (v: string) => <Tag>{v}</Tag> },
-                  { title: t('common.quantity'), dataIndex: 'actual_weight_kg', key: 'actual_weight_kg', render: (v: number) => `${Number(v).toFixed(2)} kg` },
+                  {
+                    title: 'Kalan / Kesim Ağırlığı',
+                    key: 'weight',
+                    render: (_: unknown, r: any) => {
+                      const rem = r.remaining_kg !== undefined && r.remaining_kg !== null ? Number(r.remaining_kg) : Number(r.actual_weight_kg);
+                      const orig = Number(r.actual_weight_kg);
+                      return (
+                        <div>
+                          <Tag color={rem > 0 ? 'green' : 'default'} style={{ fontWeight: 600 }}>
+                            {rem.toFixed(2)} kg Kalan
+                          </Tag>
+                          {rem !== orig && (
+                            <span style={{ fontSize: 11, color: '#8c8c8c' }}>
+                              (İlk Kesim: {orig.toFixed(2)} kg)
+                            </span>
+                          )}
+                        </div>
+                      );
+                    },
+                  },
                   { title: t('butchery.costShare'), dataIndex: 'allocated_cost', key: 'allocated_cost', render: (v: number) => <strong style={{ color: '#0958d9' }}>{formatMoney(v, (detail?.operation as any)?.currency)}</strong> },
                   { title: t('butchery.unitCost'), dataIndex: 'unit_cost', key: 'unit_cost', render: (v: number) => <Tag color="cyan">{formatMoney(v, (detail?.operation as any)?.currency)} / kg</Tag> },
                 ]}

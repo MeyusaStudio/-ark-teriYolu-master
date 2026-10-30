@@ -14,9 +14,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.avatar.app.data.model.Invoice
 import com.avatar.app.data.model.MarketPurchaseItem
+import com.avatar.app.ui.invoices.InvoiceDetailDialog
 import com.avatar.app.ui.theme.ForestGreen
 import com.avatar.app.ui.theme.PrimaryBlue
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,7 +29,18 @@ fun MarketPurchasesScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     var selectedPurchaseForFeedback by remember { mutableStateOf<MarketPurchaseItem?>(null) }
+    var activeInvoiceForDialog by remember { mutableStateOf<Invoice?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val apiClient = remember { com.avatar.app.data.remote.ApiClient(context) }
+
+    activeInvoiceForDialog?.let { invoice ->
+        InvoiceDetailDialog(
+            invoice = invoice,
+            onDismiss = { activeInvoiceForDialog = null }
+        )
+    }
 
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let {
@@ -140,6 +154,7 @@ fun MarketPurchasesScreen(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(state.purchases) { purchase ->
+                        val isRecalled = purchase.status == "geri_cagrildi" || purchase.lotStatus == "recalled"
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
@@ -171,12 +186,12 @@ fun MarketPurchasesScreen(
                                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                                 )
                                             }
-                                            Surface(shape = RoundedCornerShape(4.dp), color = Color(0xFFDCFCE7)) {
+                                            Surface(shape = RoundedCornerShape(4.dp), color = if (isRecalled) Color(0xFFFEE2E2) else Color(0xFFDCFCE7)) {
                                                 Text(
-                                                    "✓ Fatura Kesildi / Teslim Alındı",
+                                                    if (isRecalled) "⛔ GERİ ÇAĞRILDI" else "✓ Teslim Alındı",
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = ForestGreen,
+                                                    color = if (isRecalled) Color(0xFFDC2626) else ForestGreen,
                                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                                 )
                                             }
@@ -223,18 +238,62 @@ fun MarketPurchasesScreen(
                                 Spacer(modifier = Modifier.height(10.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End
+                                    horizontalArrangement = Arrangement.End,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     OutlinedButton(
-                                        onClick = { selectedPurchaseForFeedback = purchase },
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFDC2626)),
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                try {
+                                                    val res = apiClient.invoiceService.getInvoices(referenceType = "market_purchase", referenceId = purchase.id)
+                                                    if (res.isSuccessful && !res.body().isNullOrEmpty()) {
+                                                        activeInvoiceForDialog = res.body()!!.first()
+                                                    } else {
+                                                        snackbarHostState.showSnackbar("Bu alıma ait fatura belgesi bulunamadı.")
+                                                    }
+                                                } catch (e: Exception) {
+                                                    snackbarHostState.showSnackbar("Fatura yüklenemedi: ${e.localizedMessage}")
+                                                }
+                                            }
+                                        },
                                         shape = RoundedCornerShape(8.dp),
                                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                         modifier = Modifier.height(32.dp)
                                     ) {
-                                        Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFFDC2626))
+                                        Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(14.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Sorun / Şikayet Bildir", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text("Fatura İndir / Gör", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                    }
+
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    if (isRecalled) {
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = Color(0xFFFEE2E2),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(Icons.Default.Block, contentDescription = null, tint = Color(0xFFDC2626), modifier = Modifier.size(13.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Reyondan Çekildi", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFDC2626))
+                                            }
+                                        }
+                                    } else {
+                                        OutlinedButton(
+                                            onClick = { selectedPurchaseForFeedback = purchase },
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFDC2626)),
+                                            shape = RoundedCornerShape(8.dp),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFFDC2626))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Sorun Bildir", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }

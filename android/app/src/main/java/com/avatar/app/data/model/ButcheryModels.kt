@@ -15,7 +15,8 @@ data class ButcheryRecord(
     @SerializedName("distribution_method") val distributionMethod: String? = "agirlik",
     val currency: String? = "EUR",
     val notes: String? = null,
-    val parts: List<ButcheryPartDetail>? = null
+    val parts: List<ButcheryPartDetail>? = null,
+    val isOfflinePending: Boolean = false
 )
 
 data class ButcheryDetailResponse(
@@ -26,6 +27,7 @@ data class ButcheryDetailResponse(
 data class ButcheryPartDetail(
     @SerializedName("part_name") val partName: String,
     @SerializedName("actual_weight_kg") val actualWeightKg: Double,
+    @SerializedName("remaining_kg") val remainingKg: Double? = null,
     @SerializedName("allocated_cost") val allocatedCost: Double,
     @SerializedName("unit_cost") val unitCost: Double,
     @SerializedName("lot_number") val lotNumber: String? = null,

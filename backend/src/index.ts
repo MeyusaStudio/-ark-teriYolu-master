@@ -23,6 +23,7 @@ import invoiceRoutes      from './routes/invoice.routes';
 import anomalyRoutes      from './routes/anomaly.routes';
 import ocrRoutes          from './routes/ocr.routes';
 import currencyRoutes     from './routes/currency.routes';
+import adminRoutes        from './routes/admin.routes';
 
 dotenv.config();
 
@@ -52,6 +53,7 @@ app.use('/api/invoices',      invoiceRoutes);
 app.use('/api/anomalies',     anomalyRoutes);
 app.use('/api/ocr',           ocrRoutes);
 app.use('/api/currencies',    currencyRoutes);
+app.use('/api/admin',         adminRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -144,6 +146,8 @@ async function bootstrap() {
       { table: 'market_purchases', col: 'currency', type: "VARCHAR(10) NOT NULL DEFAULT 'EUR'" },
       { table: 'orders', col: 'currency', type: "VARCHAR(10) NOT NULL DEFAULT 'EUR'" },
       { table: 'producer_listings', col: 'currency', type: "VARCHAR(10) NOT NULL DEFAULT 'EUR'" },
+      { table: 'orders', col: 'actual_qty', type: "DECIMAL(10,3) NULL" },
+      { table: 'lots', col: 'product_name', type: "VARCHAR(150) NULL" },
     ];
     for (const c of currencyCols) {
       try {
@@ -151,6 +155,41 @@ async function bootstrap() {
       } catch {
         // Kolon zaten varsa yoksayılır
       }
+    }
+
+    // Admin Rolü ve Ban Kolonları Senkronizasyonu
+    try {
+      await sequelize.query("ALTER TABLE users MODIFY COLUMN role ENUM('hayvanci','sucukcu','market','admin') NOT NULL");
+    } catch {
+      // Yoksay
+    }
+
+    try {
+      await sequelize.query("ALTER TABLE users ADD COLUMN is_banned TINYINT(1) NOT NULL DEFAULT 0");
+    } catch {
+      // Yoksay
+    }
+
+    try {
+      await sequelize.query("ALTER TABLE users ADD COLUMN ban_reason TEXT NULL");
+    } catch {
+      // Yoksay
+    }
+
+    // Varsayılan Admin Kullanıcısı (admin@avatar.com / admin123)
+    try {
+      const [admins] = await sequelize.query("SELECT id FROM users WHERE email = 'admin@avatar.com'");
+      if (Array.isArray(admins) && admins.length === 0) {
+        const bcrypt = await import('bcryptjs');
+        const hash = await bcrypt.hash('admin123', 10);
+        await sequelize.query(
+          "INSERT INTO users (name, email, password, role, phone, address, is_active, is_banned) VALUES ('Sistem Yöneticisi', 'admin@avatar.com', ?, 'admin', '0850 000 00 00', 'AVATAR Yönetim Merkezi', 1, 0)",
+          { replacements: [hash] }
+        );
+        logger.info("Varsayılan Admin kullanıcısı oluşturuldu: admin@avatar.com / admin123");
+      }
+    } catch (err) {
+      logger.error('Admin kullanıcı oluşturulurken hata:', err);
     }
 
     app.listen(PORT, () => {

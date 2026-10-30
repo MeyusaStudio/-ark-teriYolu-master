@@ -36,12 +36,29 @@ export default function DashboardPage() {
     hayvanci: t('dashboard.welcomeHayvanci'),
     sucukcu:  t('dashboard.welcomeSucukcu'),
     market:   t('dashboard.welcomeMarket'),
+    admin:    'Sistem yönetimi, kullanıcı denetimi ve duyuru merkezi',
   };
 
   return (
     <div>
       <Title level={3}>{t('dashboard.welcome')}, {user?.name} 👋</Title>
       <Text type="secondary">{roleWelcome[user?.role || '']}</Text>
+
+      {user?.role === 'admin' && (
+        <Alert
+          style={{ marginTop: 16, marginBottom: 16 }}
+          message={
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>🛡️ <strong>Yönetici Paneli:</strong> Kullanıcıları yönetmek, banlamak veya duyuru göndermek için yönetim merkezini ziyaret edin.</span>
+              <Button type="primary" style={{ backgroundColor: '#722ed1', borderColor: '#722ed1' }} onClick={() => navigate('/admin/users')}>
+                Kullanıcı Yönetimi
+              </Button>
+            </div>
+          }
+          type="info"
+          showIcon
+        />
+      )}
 
       {qualityAlerts.length > 0 && (
         <Alert

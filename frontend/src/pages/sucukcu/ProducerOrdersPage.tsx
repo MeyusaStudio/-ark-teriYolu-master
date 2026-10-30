@@ -21,6 +21,7 @@ interface Order {
   seller_id: number;
   product_name: string;
   expected_qty: number;
+  actual_qty?: number;
   status: string;
   order_date: string;
   notes?: string;
@@ -110,8 +111,22 @@ export default function ProducerOrdersPage() {
       title: t('production.productName'), dataIndex: 'product_name', key: 'product_name',
     },
     {
-      title: t('production.expectedQty'), dataIndex: 'expected_qty', key: 'expected_qty',
-      render: (v: number) => <Tag color="blue">{Math.round(Number(v))} {t('production.packageUnit')}</Tag>,
+      title: t('production.expectedQty'), key: 'expected_qty',
+      render: (_: unknown, r: Order) => {
+        if (r.status === 'tamamlandi' && r.actual_qty) {
+          return (
+            <div>
+              <Tag color="green" style={{ fontWeight: 600 }}>{Math.round(Number(r.actual_qty))} {t('production.packageUnit')}</Tag>
+              {Math.round(Number(r.actual_qty)) !== Math.round(Number(r.expected_qty)) && (
+                <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
+                  (Sipariş: {Math.round(Number(r.expected_qty))} {t('production.packageUnit')})
+                </Text>
+              )}
+            </div>
+          );
+        }
+        return <Tag color="blue">{Math.round(Number(r.expected_qty))} {t('production.packageUnit')}</Tag>;
+      },
     },
     {
       title: t('common.status'), dataIndex: 'status', key: 'status',
@@ -224,8 +239,15 @@ export default function ProducerOrdersPage() {
                 <Text strong>{detail.order.buyer_name}</Text>
               </Descriptions.Item>
               <Descriptions.Item label={t('production.productName')}>{detail.order.product_name}</Descriptions.Item>
-              <Descriptions.Item label={t('production.expectedQty')}>
-                <Text strong style={{ color: '#52c41a' }}>{Math.round(Number(detail.order.expected_qty))} {t('production.packageUnit')}</Text>
+              <Descriptions.Item label={detail.order.status === 'tamamlandi' && detail.order.actual_qty ? 'Üretilen / Teslim Edilen Paket' : t('production.expectedQty')}>
+                <Text strong style={{ color: '#52c41a' }}>
+                  {Math.round(Number(detail.order.actual_qty ?? detail.order.expected_qty))} {t('production.packageUnit')}
+                </Text>
+                {detail.order.status === 'tamamlandi' && detail.order.actual_qty && Math.round(Number(detail.order.actual_qty)) !== Math.round(Number(detail.order.expected_qty)) && (
+                  <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>
+                    (Siparişte İstenen: {Math.round(Number(detail.order.expected_qty))} {t('production.packageUnit')})
+                  </Text>
+                )}
                 <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>(1 kg / {t('production.packageUnit')})</Text>
               </Descriptions.Item>
               <Descriptions.Item label={t('orders.orderDate')} span={2}>

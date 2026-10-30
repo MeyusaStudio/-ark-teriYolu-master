@@ -14,7 +14,11 @@ data class LotItem(
     val production_date: String? = null,
     val status: String, // "active", "recalled", "blocked", "consumed"
     val product_name: String? = null,
-    val owner_name: String? = null
+    val owner_name: String? = null,
+    val animal_ear_tag: String? = null,
+    val animal_type: String? = null,
+    val butchery_date: String? = null,
+    val butchery_operation_id: Int? = null
 ) {
     val isBlocked: Boolean
         get() = status.equals("recalled", ignoreCase = true) || status.equals("blocked", ignoreCase = true)
@@ -27,6 +31,14 @@ data class LotItem(
             else -> "Lot: $lot_number"
         }
 }
+
+data class AnimalLotGroup(
+    val earTag: String,
+    val animalType: String? = null,
+    val butcheryDate: String? = null,
+    val totalKg: Double = 0.0,
+    val parts: List<LotItem> = emptyList()
+)
 
 data class SellLotRequest(
     val customer_name: String,

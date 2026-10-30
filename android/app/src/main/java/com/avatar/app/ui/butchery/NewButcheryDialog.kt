@@ -93,7 +93,7 @@ fun NewButcheryDialog(
                                 onClick = {
                                     viewModel.submitButchery(onSuccess = onDismiss)
                                 },
-                                enabled = !state.isSubmitting,
+                                enabled = !state.isSubmitting && state.totalOutputKg <= state.inputWeightKg && state.totalOutputKg > 0 && state.inputWeightKg > 0,
                                 colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
                                 modifier = Modifier.weight(2f)
                             ) {
@@ -247,17 +247,47 @@ fun NewButcheryDialog(
                                 singleLine = true
                             )
                             OutlinedTextField(
-                                value = if (state.inputWeightKg > 0) state.inputWeightKg.toString() else "",
-                                onValueChange = {
-                                    val v = it.toDoubleOrNull() ?: 0.0
-                                    viewModel.updateFormFields(inputWeightKg = v)
-                                },
-                                label = { Text("Giriş Ağırlığı (kg)", fontSize = 12.sp) },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                value = state.operationDate,
+                                onValueChange = { viewModel.updateFormFields(operationDate = it) },
+                                label = { Text("Kesim Tarihi", fontSize = 12.sp) },
                                 modifier = Modifier.weight(1f),
                                 singleLine = true
                             )
                         }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = if (state.inputWeightKg > 0) state.inputWeightKg.toString() else "",
+                            onValueChange = {
+                                val v = it.toDoubleOrNull() ?: 0.0
+                                viewModel.updateFormFields(inputWeightKg = v)
+                            },
+                            label = { Text("Giriş Ağırlığı (kg)", fontSize = 12.sp) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Para Birimi Seçimi
+                        Text("Para Birimi Seçiniz", fontSize = 12.sp, color = Color.Gray)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf("EURO" to "€", "TL" to "₺", "DOLAR" to "$", "GBP" to "£").forEach { (curr, sym) ->
+                                val isSelected = state.currency.equals(curr, ignoreCase = true) ||
+                                        (curr == "EURO" && state.currency == "EUR") ||
+                                        (curr == "DOLAR" && state.currency == "USD") ||
+                                        (curr == "TL" && state.currency == "TRY")
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { viewModel.updateFormFields(currency = curr) },
+                                    label = { Text("$curr ($sym)", fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) }
+                                )
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -269,13 +299,13 @@ fun NewButcheryDialog(
                                     val v = it.toDoubleOrNull() ?: 0.0
                                     viewModel.updateFormFields(purchaseCost = v)
                                 },
-                                label = { Text("Toplam Alış Maliyeti (€)", fontSize = 12.sp) },
+                                label = { Text("Toplam Alış Maliyeti (${state.currency})", fontSize = 12.sp) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                 modifier = Modifier.weight(1f),
                                 singleLine = true
                             )
                             OutlinedTextField(
-                                value = String.format(Locale.US, "%.2f €/kg", state.unitCostInput),
+                                value = String.format(Locale.US, "%.2f %s/kg", state.unitCostInput, state.currency),
                                 onValueChange = {},
                                 label = { Text("Birim Maliyet", fontSize = 12.sp) },
                                 readOnly = true,
@@ -353,6 +383,39 @@ fun NewButcheryDialog(
                                         fontSize = 14.sp,
                                         color = if (state.fireRate > 15) Color(0xFFDC2626) else Color.DarkGray
                                     )
+                                }
+                            }
+                        }
+                    }
+
+                    // Ağırlık Aşımı Uyarısı
+                    if (state.totalOutputKg > state.inputWeightKg && state.inputWeightKg > 0) {
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFFEE2E2)),
+                                shape = RoundedCornerShape(10.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF87171)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("⚠️", fontSize = 22.sp)
+                                    Column {
+                                        Text(
+                                            "Ağırlık Aşımı Hatası!",
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFB91C1C),
+                                            fontSize = 13.sp
+                                        )
+                                        Text(
+                                            "Parçaların toplam ağırlığı (${String.format(Locale.US, "%.2f", state.totalOutputKg)} kg), girilen karkas ağırlığından (${String.format(Locale.US, "%.2f", state.inputWeightKg)} kg) fazla olamaz! Parçaları azaltınız.",
+                                            color = Color(0xFF991B1B),
+                                            fontSize = 11.sp
+                                        )
+                                    }
                                 }
                             }
                         }

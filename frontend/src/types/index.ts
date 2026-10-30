@@ -1,4 +1,4 @@
-export type UserRole = 'hayvanci' | 'sucukcu' | 'market';
+export type UserRole = 'hayvanci' | 'sucukcu' | 'market' | 'admin';
 
 export interface User {
   id: number;
@@ -7,6 +7,34 @@ export interface User {
   role: UserRole;
   phone?: string;
   address?: string;
+  is_banned?: number;
+  ban_reason?: string;
+}
+
+export interface AdminUserItem {
+  id: number;
+  name: string;
+  email: string;
+  role: UserRole;
+  phone?: string;
+  address?: string;
+  is_active: number;
+  is_banned: number;
+  ban_reason?: string;
+  created_at: string;
+  lot_count: number;
+  order_count: number;
+  purchase_count: number;
+  unread_notifications_count: number;
+}
+
+export interface AdminStats {
+  total: number;
+  hayvanci: number;
+  sucukcu: number;
+  market: number;
+  admin: number;
+  banned: number;
 }
 
 export interface AuthState {
@@ -30,6 +58,11 @@ export interface Lot {
   production_date?: string;
   expiry_date?: string;
   status: 'active' | 'blocked' | 'recalled' | 'consumed' | 'sold';
+  product_name?: string;
+  animal_ear_tag?: string;
+  animal_type?: string;
+  butchery_date?: string;
+  butchery_operation_id?: number;
   created_at: string;
 }
 
@@ -66,6 +99,7 @@ export interface Order {
   product_name?: string;
   status: 'beklemede' | 'onaylandi' | 'hammadde_gonderildi' | 'uretimde' | 'tamamlandi' | 'iptal';
   expected_qty: number;
+  actual_qty?: number;
   order_date: string;
 }
 

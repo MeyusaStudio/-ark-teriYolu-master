@@ -209,11 +209,20 @@ fun OrderCard(
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Ürün ve Miktar", fontSize = 10.sp, color = Color.Gray)
+                    val displayQty = if (order.status == "tamamlandi" && order.actualQty != null) {
+                        if (Math.round(order.actualQty) != Math.round(order.expectedQty)) {
+                            "${order.productName} (${Math.round(order.actualQty)} paket / Sipariş: ${Math.round(order.expectedQty)})"
+                        } else {
+                            "${order.productName} (${Math.round(order.actualQty)} paket)"
+                        }
+                    } else {
+                        "${order.productName} (${Math.round(order.expectedQty)} paket)"
+                    }
                     Text(
-                        "${order.productName} (${order.expectedQty} paket)",
+                        displayQty,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = PrimaryBlue
+                        fontSize = 12.sp,
+                        color = if (order.status == "tamamlandi") ForestGreen else PrimaryBlue
                     )
                 }
             }
@@ -309,7 +318,23 @@ fun OrderDetailDialog(
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Text("Ürün: ${order.productName}", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                Text("Beklenen Paket: ${order.expectedQty} paket", fontSize = 12.sp, color = Color.Gray)
+                                if (order.status == "tamamlandi" && order.actualQty != null) {
+                                    Text(
+                                        "Teslim Edilen / Üretilen: ${Math.round(order.actualQty)} paket",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ForestGreen
+                                    )
+                                    if (Math.round(order.actualQty) != Math.round(order.expectedQty)) {
+                                        Text(
+                                            "Siparişte İstenen: ${Math.round(order.expectedQty)} paket",
+                                            fontSize = 11.sp,
+                                            color = Color.Gray
+                                        )
+                                    }
+                                } else {
+                                    Text("Beklenen Paket: ${Math.round(order.expectedQty)} paket", fontSize = 12.sp, color = Color.Gray)
+                                }
                                 Text("Durum: ${order.status}", fontSize = 12.sp, color = PrimaryBlue, fontWeight = FontWeight.SemiBold)
                             }
                         }

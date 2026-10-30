@@ -204,7 +204,7 @@ fun FarmerListingsScreen(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(state.filteredListings) { listing ->
-                        val isActive = listing.isActive == true || listing.isActive == 1 || listing.isActive == "1"
+                        val isActive = listing.isCurrentlyActive
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),

@@ -181,7 +181,17 @@ fun ButcheryDetailDialog(
                                             )
                                         }
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Text("${part.actualWeightKg} kg", fontSize = 12.sp, color = Color.DarkGray)
+                                        val rem = part.remainingKg ?: part.actualWeightKg
+                                        Text(
+                                            if (part.remainingKg != null && part.remainingKg != part.actualWeightKg) {
+                                                "${String.format(Locale.US, "%.2f", rem)} kg Kalan (${part.actualWeightKg} kg)"
+                                            } else {
+                                                "${part.actualWeightKg} kg"
+                                            },
+                                            fontSize = 12.sp,
+                                            fontWeight = if (part.remainingKg != null) FontWeight.SemiBold else FontWeight.Normal,
+                                            color = if (rem > 0) ForestGreen else Color.Gray
+                                        )
                                     }
                                 }
                                 Column(horizontalAlignment = Alignment.End) {

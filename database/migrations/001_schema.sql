@@ -187,6 +187,7 @@ CREATE TABLE IF NOT EXISTS orders (
     status          ENUM('beklemede','onaylandi','hammadde_gonderildi','uretimde','tamamlandi','iptal') NOT NULL DEFAULT 'beklemede',
     order_date      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expected_qty    DECIMAL(10,3) NOT NULL,  -- beklenen mamul miktarı
+    actual_qty      DECIMAL(10,3) NULL,      -- üretici tarafından gerçekleşen net mamul paketi
     notes           TEXT,
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (buyer_id)  REFERENCES users(id),

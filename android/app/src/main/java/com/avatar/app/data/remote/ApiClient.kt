@@ -77,6 +77,18 @@ class ApiClient(private val context: Context) {
     val purchaseService: PurchaseApiService
         get() = retrofit.create(PurchaseApiService::class.java)
 
+    val invoiceService: InvoiceApiService
+        get() = retrofit.create(InvoiceApiService::class.java)
+
+    val ocrService: OcrApiService
+        get() = retrofit.create(OcrApiService::class.java)
+
+    val adminService: AdminApiService
+        get() = retrofit.create(AdminApiService::class.java)
+
+    val notificationService: NotificationApiService
+        get() = retrofit.create(NotificationApiService::class.java)
+
     fun parseError(responseBodyString: String?): String {
         if (responseBodyString.isNullOrBlank()) return "Bilinmeyen bir hata oluştu"
         return try {

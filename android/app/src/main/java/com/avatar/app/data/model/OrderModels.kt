@@ -13,6 +13,7 @@ data class Order(
     @SerializedName("listing_id") val listingId: Int? = null,
     @SerializedName("product_name") val productName: String,
     @SerializedName("expected_qty") val expectedQty: Double,
+    @SerializedName("actual_qty") val actualQty: Double? = null,
     val status: String, // "beklemede", "onaylandi", "hammadde_gonderildi", "uretimde", "tamamlandi", "iptal"
     @SerializedName("order_date") val orderDate: String,
     val notes: String? = null,

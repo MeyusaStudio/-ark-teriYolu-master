@@ -20,6 +20,7 @@ import LotTracePage from './pages/shared/LotTracePage';
 import RecallPage from './pages/shared/RecallPage';
 import ReportsPage from './pages/shared/ReportsPage';
 import { InvoicesPage } from './pages/shared/InvoicesPage';
+import AdminUsersPage from './pages/admin/AdminUsersPage';
 import { LanguageProvider } from './i18n';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -65,6 +66,8 @@ export default function App() {
             <Route path="recalls"                  element={<RecallPage />} />
             <Route path="reports"                  element={<ReportsPage />} />
             <Route path="invoices"                 element={<InvoicesPage />} />
+            {/* Yönetici */}
+            <Route path="admin/users"              element={<AdminUsersPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

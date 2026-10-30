@@ -10,6 +10,7 @@ router.use(authenticate);
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
+    const userRole = req.user!.role;
     const { type, reference_type, reference_id, order_id } = req.query;
 
     let query = `
@@ -27,6 +28,21 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       WHERE (i.sender_id = ? OR i.receiver_id = ?)
     `;
     const params: unknown[] = [userId, userId];
+
+    // Rol bazlı kesin yetkilendirme ve taraf kontrolü:
+    // - market: Sadece satın aldığı mamul satış faturalarını (alıcı olarak) görebilir.
+    // - sucukcu: Sadece verdiği fason üretim işçilik hizmet faturalarını (düzenleyen/satıcı olarak) görebilir.
+    // - hayvanci: Fason hizmet faturasında alıcı (hizmet alan), mamul satışında ise düzenleyen (satıcı) olarak görür.
+    if (userRole === 'market') {
+      query += ` AND i.invoice_type = 'satis' AND i.receiver_id = ?`;
+      params.push(userId);
+    } else if (userRole === 'sucukcu') {
+      query += ` AND i.invoice_type = 'hizmet' AND i.sender_id = ?`;
+      params.push(userId);
+    } else if (userRole === 'hayvanci') {
+      query += ` AND ((i.invoice_type = 'hizmet' AND i.receiver_id = ?) OR (i.invoice_type = 'satis' AND i.sender_id = ?))`;
+      params.push(userId, userId);
+    }
 
     if (type) {
       query += ` AND i.invoice_type = ?`;
@@ -63,11 +79,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
+    const userRole = req.user!.role;
     const invoiceId = req.params.id;
 
-    const invoices = await selectQuery(
-      sequelize,
-      `
+    let query = `
       SELECT 
         i.*,
         u_sender.name   AS sender_name,
@@ -80,9 +95,21 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       JOIN users u_sender ON i.sender_id = u_sender.id
       JOIN users u_recv   ON i.receiver_id = u_recv.id
       WHERE i.id = ? AND (i.sender_id = ? OR i.receiver_id = ?)
-      `,
-      [invoiceId, userId, userId]
-    );
+    `;
+    const params: unknown[] = [invoiceId, userId, userId];
+
+    if (userRole === 'market') {
+      query += ` AND i.invoice_type = 'satis' AND i.receiver_id = ?`;
+      params.push(userId);
+    } else if (userRole === 'sucukcu') {
+      query += ` AND i.invoice_type = 'hizmet' AND i.sender_id = ?`;
+      params.push(userId);
+    } else if (userRole === 'hayvanci') {
+      query += ` AND ((i.invoice_type = 'hizmet' AND i.receiver_id = ?) OR (i.invoice_type = 'satis' AND i.sender_id = ?))`;
+      params.push(userId, userId);
+    }
+
+    const invoices = await selectQuery(sequelize, query, params);
 
     if (invoices.length === 0) {
       res.status(404).json({ error: 'Fatura bulunamadı veya bu faturayı görüntüleme yetkiniz yok' });

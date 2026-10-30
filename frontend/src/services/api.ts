@@ -159,3 +159,14 @@ export const currencyService = {
   convert: (amount: number, from: string, to: string) =>
     api.post('/currencies/convert', { amount, from, to }),
 };
+
+// Admin Hizmetleri
+export const adminService = {
+  getUsers: (params?: { role?: string; status?: string; q?: string }) =>
+    api.get('/admin/users', { params }),
+  banUser: (id: number, data: { is_banned: boolean; ban_reason?: string }) =>
+    api.patch(`/admin/users/${id}/ban`, data),
+  sendNotification: (data: { user_id?: number; user_ids?: number[]; role?: string; title: string; message: string }) =>
+    api.post('/admin/notifications', data),
+  getStats: () => api.get('/admin/stats'),
+};

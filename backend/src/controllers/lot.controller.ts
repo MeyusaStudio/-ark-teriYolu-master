@@ -8,10 +8,15 @@ export async function getLots(req: AuthRequest, res: Response): Promise<void> {
     const lots = await selectQuery(
       sequelize,
       `SELECT l.*, u.name as owner_name,
-              COALESCE(bp.part_name, po.product_name, fl.product_name, l.lot_type) as product_name
+              COALESCE(bp.part_name, po.product_name, fl.product_name, l.lot_type) as product_name,
+              bo.animal_ear_tag,
+              bo.animal_type,
+              bo.operation_date as butchery_date,
+              bo.id as butchery_operation_id
        FROM lots l
        JOIN users u ON l.owner_id = u.id
        LEFT JOIN butchery_parts bp ON l.id = bp.lot_id
+       LEFT JOIN butchery_operations bo ON bp.butchery_operation_id = bo.id
        LEFT JOIN production_finished_lots pfl ON l.id = pfl.lot_id
        LEFT JOIN production_orders po ON pfl.production_order_id = po.id
        LEFT JOIN farmer_listings fl ON l.id = fl.lot_id

@@ -2,6 +2,7 @@ package com.avatar.app.ui.auth
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -137,7 +138,9 @@ fun LoginScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         FilterChip(
@@ -163,6 +166,14 @@ fun LoginScreen(
                                 password = "123456"
                             },
                             label = { Text("🛒 Market", fontSize = 11.sp) }
+                        )
+                        FilterChip(
+                            selected = email == "admin@avatar.com",
+                            onClick = {
+                                email = "admin@avatar.com"
+                                password = "admin123"
+                            },
+                            label = { Text("🛡️ Admin", fontSize = 11.sp) }
                         )
                     }
                 }

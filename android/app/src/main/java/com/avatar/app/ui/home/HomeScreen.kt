@@ -1,5 +1,6 @@
 package com.avatar.app.ui.home
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,10 +18,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.avatar.app.data.model.User
+import com.avatar.app.ui.admin.AdminUsersScreen
+import com.avatar.app.ui.admin.AdminViewModel
 import com.avatar.app.ui.auth.AuthViewModel
 import com.avatar.app.ui.butchery.ButcheryScreen
 import com.avatar.app.ui.butchery.ButcheryViewModel
 import com.avatar.app.ui.components.ServerConfigDialog
+import com.avatar.app.ui.invoices.InvoicesScreen
+import com.avatar.app.ui.invoices.InvoicesViewModel
 import com.avatar.app.ui.listings.FarmerListingsScreen
 import com.avatar.app.ui.listings.FarmerListingsViewModel
 import com.avatar.app.ui.listings.ProducerListingsManageScreen
@@ -31,6 +36,8 @@ import com.avatar.app.ui.lots.LotsViewModel
 import com.avatar.app.ui.market.MarketListingsScreen
 import com.avatar.app.ui.market.MarketPurchasesScreen
 import com.avatar.app.ui.market.MarketViewModel
+import com.avatar.app.ui.notifications.NotificationsDialog
+import com.avatar.app.ui.notifications.NotificationsViewModel
 import com.avatar.app.ui.orders.OrdersScreen
 import com.avatar.app.ui.orders.OrdersViewModel
 import com.avatar.app.ui.production.ProductionScreen
@@ -49,6 +56,8 @@ fun HomeScreen(
     authViewModel: AuthViewModel
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
+    var showNotificationsDialog by remember { mutableStateOf(false) }
+
     val butcheryViewModel: ButcheryViewModel = viewModel()
     val rawMaterialsViewModel: RawMaterialsViewModel = viewModel()
     val listingsViewModel: ProducerListingsViewModel = viewModel()
@@ -59,13 +68,51 @@ fun HomeScreen(
     val lotsViewModel: LotsViewModel = viewModel()
     val recallsViewModel: RecallsViewModel = viewModel()
     val marketViewModel: MarketViewModel = viewModel()
+    val invoicesViewModel: InvoicesViewModel = viewModel()
+    val adminViewModel: AdminViewModel = viewModel()
+    val notificationsViewModel: NotificationsViewModel = viewModel()
 
+    val notifState by notificationsViewModel.uiState.collectAsState()
     val role = user.role.lowercase()
 
+    if (showNotificationsDialog) {
+        NotificationsDialog(
+            viewModel = notificationsViewModel,
+            onDismiss = { showNotificationsDialog = false }
+        )
+    }
+
     Scaffold(
+        floatingActionButton = {
+            if (notifState.unreadCount > 0 && role != "admin") {
+                ExtendedFloatingActionButton(
+                    onClick = { showNotificationsDialog = true },
+                    containerColor = Color(0xFFDC2626),
+                    contentColor = Color.White,
+                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
+                ) {
+                    Icon(Icons.Default.NotificationsActive, contentDescription = null)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("${notifState.unreadCount} Yeni Mesaj", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+        },
         bottomBar = {
             NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
-                if (role == "hayvanci") {
+                if (role == "admin") {
+                    NavigationBarItem(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        icon = { Icon(Icons.Default.ManageAccounts, contentDescription = "Kullanıcılar") },
+                        label = { Text("Kullanıcılar", fontSize = 11.sp) }
+                    )
+                    NavigationBarItem(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        icon = { Icon(Icons.Default.Person, contentDescription = "Profil") },
+                        label = { Text("Profil", fontSize = 11.sp) }
+                    )
+                } else if (role == "hayvanci") {
                     NavigationBarItem(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
@@ -151,27 +198,56 @@ fun HomeScreen(
         }
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
-            if (role == "hayvanci") {
+            if (role == "admin") {
+                when (selectedTab) {
+                    0 -> AdminUsersScreen(viewModel = adminViewModel, onOpenNotifications = { showNotificationsDialog = true })
+                    1 -> ProfileScreen(
+                        user = user,
+                        authViewModel = authViewModel,
+                        invoicesViewModel = invoicesViewModel,
+                        notificationsViewModel = notificationsViewModel,
+                        onOpenNotifications = { showNotificationsDialog = true }
+                    )
+                }
+            } else if (role == "hayvanci") {
                 when (selectedTab) {
                     0 -> ButcheryScreen(viewModel = butcheryViewModel)
                     1 -> RawMaterialsScreen(viewModel = rawMaterialsViewModel)
                     2 -> HayvanciListingsContainer(producerViewModel = listingsViewModel, farmerViewModel = farmerListingsViewModel)
                     3 -> HayvanciOrdersAndSalesContainer(user = user, ordersViewModel = ordersViewModel, salesViewModel = farmerSalesViewModel)
                     4 -> HayvanciLotsAndRecallsContainer(lotsViewModel = lotsViewModel, recallsViewModel = recallsViewModel)
-                    5 -> ProfileScreen(user = user, authViewModel = authViewModel)
+                    5 -> ProfileScreen(
+                        user = user,
+                        authViewModel = authViewModel,
+                        invoicesViewModel = invoicesViewModel,
+                        notificationsViewModel = notificationsViewModel,
+                        onOpenNotifications = { showNotificationsDialog = true }
+                    )
                 }
             } else if (role == "sucukcu") {
                 when (selectedTab) {
                     0 -> ProducerListingsManageScreen(viewModel = listingsViewModel)
                     1 -> OrdersScreen(user = user, viewModel = ordersViewModel, onNavigateToProduction = { selectedTab = 2 })
                     2 -> ProductionScreen(viewModel = productionViewModel)
-                    3 -> ProfileScreen(user = user, authViewModel = authViewModel)
+                    3 -> ProfileScreen(
+                        user = user,
+                        authViewModel = authViewModel,
+                        invoicesViewModel = invoicesViewModel,
+                        notificationsViewModel = notificationsViewModel,
+                        onOpenNotifications = { showNotificationsDialog = true }
+                    )
                 }
             } else {
                 when (selectedTab) {
                     0 -> MarketListingsScreen(viewModel = marketViewModel)
                     1 -> MarketPurchasesScreen(viewModel = marketViewModel)
-                    2 -> ProfileScreen(user = user, authViewModel = authViewModel)
+                    2 -> ProfileScreen(
+                        user = user,
+                        authViewModel = authViewModel,
+                        invoicesViewModel = invoicesViewModel,
+                        notificationsViewModel = notificationsViewModel,
+                        onOpenNotifications = { showNotificationsDialog = true }
+                    )
                 }
             }
         }
@@ -282,10 +358,24 @@ fun HayvanciLotsAndRecallsContainer(
 @Composable
 fun ProfileScreen(
     user: User,
-    authViewModel: AuthViewModel
+    authViewModel: AuthViewModel,
+    invoicesViewModel: InvoicesViewModel,
+    notificationsViewModel: NotificationsViewModel? = null,
+    onOpenNotifications: () -> Unit = {}
 ) {
     val authState by authViewModel.uiState.collectAsState()
+    val notifState = notificationsViewModel?.uiState?.collectAsState()?.value
     var showServerDialog by remember { mutableStateOf(false) }
+    var showInvoicesScreen by remember { mutableStateOf(false) }
+
+    if (showInvoicesScreen) {
+        InvoicesScreen(
+            user = user,
+            viewModel = invoicesViewModel,
+            onBack = { showInvoicesScreen = false }
+        )
+        return
+    }
 
     if (showServerDialog) {
         ServerConfigDialog(
@@ -302,6 +392,19 @@ fun ProfileScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Profil & Sistem Durumu", fontWeight = FontWeight.Bold, color = Color.White) },
+                actions = {
+                    IconButton(onClick = onOpenNotifications) {
+                        BadgedBox(
+                            badge = {
+                                if ((notifState?.unreadCount ?: 0) > 0) {
+                                    Badge { Text(notifState!!.unreadCount.toString()) }
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.Notifications, contentDescription = "Bildirimler", tint = Color.White)
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryBlue)
             )
         }
@@ -328,19 +431,21 @@ fun ProfileScreen(
                     ) {
                         Surface(
                             shape = RoundedCornerShape(50),
-                            color = when (user.role) {
+                            color = when (user.role.lowercase()) {
                                 "hayvanci" -> ForestGreen.copy(alpha = 0.2f)
                                 "sucukcu" -> PrimaryBlue.copy(alpha = 0.2f)
-                                else -> OrangeMarket.copy(alpha = 0.2f)
+                                "market" -> OrangeMarket.copy(alpha = 0.2f)
+                                else -> Color(0xFF6B21A8).copy(alpha = 0.2f)
                             },
                             modifier = Modifier.size(52.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
-                                    when (user.role) {
+                                    when (user.role.lowercase()) {
                                         "hayvanci" -> "🐑"
                                         "sucukcu" -> "🥩"
-                                        else -> "🛒"
+                                        "market" -> "🛒"
+                                        else -> "🛡️"
                                     },
                                     fontSize = 24.sp
                                 )
@@ -352,18 +457,20 @@ fun ProfileScreen(
                             Text(user.email, fontSize = 13.sp, color = Color.Gray)
                             Surface(
                                 shape = RoundedCornerShape(4.dp),
-                                color = when (user.role) {
+                                color = when (user.role.lowercase()) {
                                     "hayvanci" -> ForestGreen
                                     "sucukcu" -> PrimaryBlue
-                                    else -> OrangeMarket
+                                    "market" -> OrangeMarket
+                                    else -> Color(0xFF6B21A8)
                                 },
                                 modifier = Modifier.padding(top = 4.dp)
                             ) {
                                 Text(
-                                    when (user.role) {
+                                    when (user.role.lowercase()) {
                                         "hayvanci" -> "İşletme (Hayvancı)"
                                         "sucukcu" -> "Üretici (Sucukçu)"
-                                        else -> "Market / Tüketici"
+                                        "market" -> "Market / Tüketici"
+                                        else -> "Sistem Yöneticisi (Admin)"
                                     },
                                     color = Color.White,
                                     fontSize = 11.sp,
@@ -373,6 +480,94 @@ fun ProfileScreen(
                             }
                         }
                     }
+                }
+            }
+
+            // Bildirimler & Mesajlar Kartı
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                shape = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenNotifications() }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFFFEF3C7),
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Notifications, contentDescription = null, tint = Color(0xFFD97706))
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("🔔 Bildirimler & Yönetici Mesajları", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                if ((notifState?.unreadCount ?: 0) > 0) {
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = Color(0xFFDC2626)
+                                    ) {
+                                        Text(
+                                            "${notifState!!.unreadCount} yeni",
+                                            color = Color.White,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            Text("Yönetici mesajları, geri çağırmalar ve sistem duyuruları", fontSize = 11.sp, color = Color.Gray)
+                        }
+                    }
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
+                }
+            }
+
+            // E-Faturalar & E-Arşiv Belgesi Kartı
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                shape = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showInvoicesScreen = true }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFFEFF6FF),
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.ReceiptLong, contentDescription = null, tint = PrimaryBlue)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text("📄 E-Faturalar & E-Arşiv", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Fason ve mamul satış faturalarını inceleyin / indirin", fontSize = 11.sp, color = Color.Gray)
+                        }
+                    }
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
                 }
             }
 

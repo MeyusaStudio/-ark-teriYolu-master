@@ -59,9 +59,9 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    const users = await selectQuery<{ id: number; name: string; email: string; password: string; role: string }>(
+    const users = await selectQuery<{ id: number; name: string; email: string; password: string; role: string; is_banned?: number; ban_reason?: string }>(
       sequelize,
-      'SELECT id, name, email, password, role FROM users WHERE email = ? AND is_active = 1',
+      'SELECT id, name, email, password, role, is_banned, ban_reason FROM users WHERE email = ? AND is_active = 1',
       [email]
     );
 
@@ -71,6 +71,17 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
 
     const user = users[0];
+
+    // Ban kontrolü
+    if (user.is_banned === 1) {
+      res.status(403).json({
+        error: user.ban_reason
+          ? `Hesabınız yönetici tarafından askıya alınmıştır. Gerekçe: ${user.ban_reason}`
+          : 'Hesabınız yönetici tarafından askıya alınmıştır (banlandı).'
+      });
+      return;
+    }
+
     const isValid = await bcrypt.compare(password, user.password);
 
     if (!isValid) {

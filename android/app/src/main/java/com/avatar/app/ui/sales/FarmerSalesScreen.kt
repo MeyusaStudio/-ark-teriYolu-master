@@ -17,9 +17,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.avatar.app.data.model.ComplaintItem
+import com.avatar.app.data.model.Invoice
 import com.avatar.app.data.model.MarketPurchaseItem
+import com.avatar.app.ui.invoices.InvoiceDetailDialog
 import com.avatar.app.ui.theme.ForestGreen
 import com.avatar.app.ui.theme.PrimaryBlue
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,6 +34,17 @@ fun FarmerSalesScreen(
     var selectedTab by remember { mutableIntStateOf(0) } // 0 = Satışlar, 1 = Şikayetler
     var recallLotTarget by remember { mutableStateOf<Pair<Int, String>?>(null) } // lotId to lotNumber
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val apiClient = remember { com.avatar.app.data.remote.ApiClient(context) }
+    var activeInvoiceForDialog by remember { mutableStateOf<Invoice?>(null) }
+
+    activeInvoiceForDialog?.let { invoice ->
+        InvoiceDetailDialog(
+            invoice = invoice,
+            onDismiss = { activeInvoiceForDialog = null }
+        )
+    }
 
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let {
@@ -222,6 +236,20 @@ fun FarmerSalesScreen(
                                 sale = sale,
                                 onInitiateRecall = {
                                     recallLotTarget = Pair(sale.lotId, sale.lotNumber)
+                                },
+                                onViewInvoice = {
+                                    coroutineScope.launch {
+                                        try {
+                                            val res = apiClient.invoiceService.getInvoices(referenceType = "market_purchase", referenceId = sale.id)
+                                            if (res.isSuccessful && !res.body().isNullOrEmpty()) {
+                                                activeInvoiceForDialog = res.body()!!.first()
+                                            } else {
+                                                snackbarHostState.showSnackbar("Bu satışa ait fatura kaydı bulunamadı.")
+                                            }
+                                        } catch (e: Exception) {
+                                            snackbarHostState.showSnackbar("Fatura yüklenemedi: ${e.localizedMessage}")
+                                        }
+                                    }
                                 }
                             )
                         }
@@ -262,8 +290,11 @@ fun FarmerSalesScreen(
 @Composable
 fun SaleItemCard(
     sale: MarketPurchaseItem,
-    onInitiateRecall: () -> Unit
+    onInitiateRecall: () -> Unit,
+    onViewInvoice: () -> Unit
 ) {
+    val isRecalled = sale.status == "geri_cagrildi" || sale.lotStatus == "recalled"
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -295,12 +326,15 @@ fun SaleItemCard(
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
-                        Surface(shape = RoundedCornerShape(4.dp), color = Color(0xFFDCFCE7)) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = if (isRecalled) Color(0xFFFEE2E2) else Color(0xFFDCFCE7)
+                        ) {
                             Text(
-                                "✓ Teslim Edildi / Ödendi",
+                                if (isRecalled) "⛔ GERİ ÇAĞRILDI / BLOKE" else "✓ Teslim Edildi / Ödendi",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = ForestGreen,
+                                color = if (isRecalled) Color(0xFFDC2626) else ForestGreen,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
@@ -326,7 +360,7 @@ fun SaleItemCard(
             HorizontalDivider(color = Color(0xFFF1F5F9))
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Alıcı Market Bilgisi
+            // Alıcı Market Bilgisi & Fatura Butonu
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -343,11 +377,23 @@ fun SaleItemCard(
                     }
                 }
 
-                Text(
-                    sale.purchaseDate.take(10),
-                    fontSize = 11.sp,
-                    color = Color.Gray
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        sale.purchaseDate.take(10),
+                        fontSize = 11.sp,
+                        color = Color.Gray
+                    )
+                    OutlinedButton(
+                        onClick = onViewInvoice,
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(13.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Fatura İndir / Gör", fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
             }
 
             // Kalite Şikayeti / Sorun Varsa
@@ -369,13 +415,35 @@ fun SaleItemCard(
                             color = Color(0xFF991B1B),
                             modifier = Modifier.padding(vertical = 4.dp)
                         )
-                        Button(
-                            onClick = onInitiateRecall,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                            modifier = Modifier.height(28.dp)
-                        ) {
-                            Text("⛔ Bu Partiyi Geri Çağır & Bloke Et", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        if (isRecalled) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFFDCFCE7),
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = ForestGreen, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        "Bu parti geri çağrılmıştır (tüm market satışları bloke edildi).",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFF166534)
+                                    )
+                                }
+                            }
+                        } else {
+                            Button(
+                                onClick = onInitiateRecall,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Text("⛔ Bu Partiyi Geri Çağır & Bloke Et", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -389,11 +457,13 @@ fun ComplaintItemCard(
     complaint: ComplaintItem,
     onInitiateRecall: () -> Unit
 ) {
+    val isComplaintRecalled = complaint.lotStatus == "recalled"
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFCA5A5))
+        colors = CardDefaults.cardColors(containerColor = if (isComplaintRecalled) Color(0xFFF8FAFC) else Color(0xFFFEF2F2)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isComplaintRecalled) Color(0xFFE2E8F0) else Color(0xFFFCA5A5))
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -402,26 +472,58 @@ fun ComplaintItemCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.ReportProblem, contentDescription = null, tint = Color(0xFFDC2626), modifier = Modifier.size(20.dp))
+                    Icon(
+                        if (isComplaintRecalled) Icons.Default.CheckCircle else Icons.Default.ReportProblem,
+                        contentDescription = null,
+                        tint = if (isComplaintRecalled) ForestGreen else Color(0xFFDC2626),
+                        modifier = Modifier.size(20.dp)
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Lot No: ${complaint.lotNumber}", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF991B1B))
+                    Text(
+                        "Lot No: ${complaint.lotNumber}",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = if (isComplaintRecalled) Color(0xFF166534) else Color(0xFF991B1B)
+                    )
                 }
                 Text(complaint.createdAt.take(10), fontSize = 11.sp, color = Color.Gray)
             }
 
             Spacer(modifier = Modifier.height(6.dp))
             Text(complaint.title, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Color.DarkGray)
-            Text(complaint.message, fontSize = 12.sp, color = Color(0xFF7F1D1D), modifier = Modifier.padding(vertical = 4.dp))
+            Text(complaint.message, fontSize = 12.sp, color = if (isComplaintRecalled) Color.Gray else Color(0xFF7F1D1D), modifier = Modifier.padding(vertical = 4.dp))
 
             Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = onInitiateRecall,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("⛔ Geri Çağırma (Recall) Başlat ve Partiyi Bloke Et", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            if (isComplaintRecalled) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFDCFCE7),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = ForestGreen, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "✓ Bu partiye ait ürünler tüm marketlerden geri çağrıldı ve stok bloke edildi.",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF166534)
+                        )
+                    }
+                }
+            } else {
+                Button(
+                    onClick = onInitiateRecall,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("⛔ Geri Çağırma (Recall) Başlat ve Partiyi Bloke Et", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
             }
         }
     }

@@ -599,4 +599,49 @@ class ProducerListingsViewModel(application: Application) : AndroidViewModel(app
     fun clearMessages() {
         _uiState.update { it.copy(errorMessage = null, successMessage = null) }
     }
+
+    fun toggleProducerListing(id: Int) {
+        viewModelScope.launch {
+            try {
+                val resp = apiClient.listingService.toggleProducerListing(id)
+                if (resp.isSuccessful) {
+                    loadMyProducerListings()
+                } else {
+                    val err = apiClient.parseError(resp.errorBody()?.string())
+                    _uiState.update { it.copy(errorMessage = err) }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Durum güncellenemedi: ${e.localizedMessage}") }
+            }
+        }
+    }
+
+    fun updateProducerListing(
+        id: Int,
+        servicePrice: Double,
+        minOrderQty: Double?,
+        description: String?,
+        onSuccess: () -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val body = mapOf(
+                    "service_price" to servicePrice,
+                    "min_order_qty" to (minOrderQty ?: 1.0),
+                    "description" to (description ?: "")
+                )
+                val resp = apiClient.listingService.updateProducerListing(id, body)
+                if (resp.isSuccessful) {
+                    _uiState.update { it.copy(successMessage = "İlan güncellendi") }
+                    loadMyProducerListings()
+                    onSuccess()
+                } else {
+                    val err = apiClient.parseError(resp.errorBody()?.string())
+                    _uiState.update { it.copy(errorMessage = err) }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "İlan güncellenemedi: ${e.localizedMessage}") }
+            }
+        }
+    }
 }

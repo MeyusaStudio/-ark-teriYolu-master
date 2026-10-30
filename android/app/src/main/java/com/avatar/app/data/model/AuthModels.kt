@@ -4,16 +4,21 @@ data class User(
     val id: Int,
     val name: String,
     val email: String,
-    val role: String, // "hayvanci", "sucukcu", "market"
+    val role: String, // "hayvanci", "sucukcu", "market", "admin"
     val phone: String? = null,
     val address: String? = null,
-    val created_at: String? = null
+    val created_at: String? = null,
+    val is_banned: Int? = 0,
+    val ban_reason: String? = null
 ) {
+    val isBanned: Boolean get() = is_banned == 1
+
     val roleDisplayTitle: String
         get() = when (role.lowercase()) {
             "hayvanci" -> "İşletme / Çiftlik"
             "sucukcu" -> "Üretici / Fason"
             "market" -> "Süpermarket / Alıcı"
+            "admin" -> "Sistem Yöneticisi"
             else -> role
         }
 
@@ -22,6 +27,7 @@ data class User(
             "hayvanci" -> "🐑"
             "sucukcu" -> "🥩"
             "market" -> "🛒"
+            "admin" -> "🛡️"
             else -> "👤"
         }
 }

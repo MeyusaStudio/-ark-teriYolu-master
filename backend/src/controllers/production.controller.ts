@@ -65,10 +65,10 @@ export async function completeProduction(req: AuthRequest, res: Response): Promi
 
     const lotId = await insertQuery(
       sequelize,
-      `INSERT INTO lots (lot_number, lot_type, owner_id, quantity, unit, unit_cost, total_cost, production_date, status)
-       SELECT ?, 'mamul', o.buyer_id, ?, 'paket', ?, ?, ?, 'active'
+      `INSERT INTO lots (lot_number, lot_type, owner_id, quantity, unit, unit_cost, total_cost, production_date, status, product_name)
+       SELECT ?, 'mamul', o.buyer_id, ?, 'paket', ?, ?, ?, 'active', ?
        FROM orders o WHERE o.id = ?`,
-      [lotNumber, actualPackages, ekp, totalCost, production_date || new Date(), productionOrder.order_id],
+      [lotNumber, actualPackages, ekp, totalCost, production_date || new Date(), productionOrder.product_name, productionOrder.order_id],
       t
     );
 
@@ -87,9 +87,10 @@ export async function completeProduction(req: AuthRequest, res: Response): Promi
       t
     );
 
+    // Siparişin durumunu tamamlandı yap ve gerçekleşen net teslim paket adedini (actual_qty) kaydet!
     await sequelize.query(
-      "UPDATE orders SET status = 'tamamlandi' WHERE id = ?",
-      { replacements: [productionOrder.order_id], transaction: t }
+      "UPDATE orders SET status = 'tamamlandi', actual_qty = ? WHERE id = ?",
+      { replacements: [actualPackages, productionOrder.order_id], transaction: t }
     );
 
     // Fason Üretim / İşçilik Hizmeti Faturası oluştur (Sucukçu -> İşletme / Hayvancı)
@@ -123,6 +124,18 @@ export async function completeProduction(req: AuthRequest, res: Response): Promi
         ],
         transaction: t
       }
+    );
+
+    // İşletmeye (Hayvancıya) üretimin tamamlandığını ve gerçekleşen paket miktarını bildiren bildirim gönder
+    await insertQuery(
+      sequelize,
+      `INSERT INTO notifications (user_id, type, title, message, reference_type, reference_id)
+       SELECT o.buyer_id, 'uretim', 'Üretim Tamamlandı & Mamul Teslim Edildi',
+              CONCAT('Fason üretim tamamlandı. ', ?, ' paket ', ?, ' mamul stoğunuza eklendi (Fatura: ', ?, ').'),
+              'order', ?
+       FROM orders o WHERE o.id = ?`,
+      [actualPackages, productionOrder.product_name, invoiceNumber, productionOrder.order_id, productionOrder.order_id],
+      t
     );
 
     await t.commit();

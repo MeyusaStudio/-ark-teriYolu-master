@@ -10,6 +10,9 @@ interface ButcheryDao {
     @Query("SELECT * FROM butchery_operations ORDER BY operationDate DESC, id DESC")
     fun getAllOperations(): Flow<List<ButcheryOperationEntity>>
 
+    @Query("SELECT * FROM butchery_operations ORDER BY operationDate DESC, id DESC")
+    suspend fun getAllOperationsList(): List<ButcheryOperationEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOperations(ops: List<ButcheryOperationEntity>)
 
@@ -24,6 +27,9 @@ interface ButcheryDao {
 interface RawMaterialDao {
     @Query("SELECT * FROM raw_materials ORDER BY id DESC")
     fun getAllMaterials(): Flow<List<RawMaterialEntity>>
+
+    @Query("SELECT * FROM raw_materials ORDER BY id DESC")
+    suspend fun getAllMaterialsList(): List<RawMaterialEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMaterials(materials: List<RawMaterialEntity>)

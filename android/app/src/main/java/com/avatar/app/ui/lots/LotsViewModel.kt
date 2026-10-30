@@ -3,6 +3,7 @@ package com.avatar.app.ui.lots
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.avatar.app.data.model.AnimalLotGroup
 import com.avatar.app.data.model.LotItem
 import com.avatar.app.data.remote.ApiClient
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,10 +33,51 @@ data class LotsUiState(
                 list = list.filter {
                     it.lot_number.lowercase().contains(q) ||
                     (it.product_name?.lowercase()?.contains(q) == true) ||
-                    (it.displayName.lowercase().contains(q))
+                    (it.displayName.lowercase().contains(q)) ||
+                    (it.animal_ear_tag?.lowercase()?.contains(q) == true) ||
+                    (it.supplier_name?.lowercase()?.contains(q) == true)
                 }
             }
             return list
+        }
+
+    val animalGroups: List<AnimalLotGroup>
+        get() {
+            val groupsMap = linkedMapOf<String, MutableList<LotItem>>()
+            val animalInfoMap = mutableMapOf<String, Pair<String?, String?>>()
+
+            filteredLots.forEach { lot ->
+                val tag = lot.animal_ear_tag ?: if (lot.lot_type.equals("parca", ignoreCase = true) || isMeatLot(lot)) {
+                    if (lot.butchery_operation_id != null) "Kesim #${lot.butchery_operation_id}" else "Parçalama Etleri"
+                } else null
+
+                if (tag != null) {
+                    groupsMap.getOrPut(tag) { mutableListOf() }.add(lot)
+                    if (!animalInfoMap.containsKey(tag)) {
+                        val aType = lot.animal_type ?: if (tag.contains("KUZU", ignoreCase = true)) "Koyun / Kuzu" else if (tag.contains("DANA", ignoreCase = true)) "Dana / Sığır" else "Büyükbaş / Küçükbaş"
+                        val bDate = lot.butchery_date ?: lot.production_date
+                        animalInfoMap[tag] = Pair(aType, bDate)
+                    }
+                }
+            }
+
+            return groupsMap.map { (tag, parts) ->
+                val info = animalInfoMap[tag]
+                AnimalLotGroup(
+                    earTag = tag,
+                    animalType = info?.first,
+                    butcheryDate = info?.second,
+                    totalKg = parts.sumOf { it.quantity },
+                    parts = parts
+                )
+            }
+        }
+
+    val otherLots: List<LotItem>
+        get() {
+            return filteredLots.filter { lot ->
+                lot.animal_ear_tag == null && !lot.lot_type.equals("parca", ignoreCase = true) && !isMeatLot(lot)
+            }
         }
 
     val etCount: Int
@@ -51,13 +93,15 @@ data class LotsUiState(
         fun isMeatLot(lot: LotItem): Boolean {
             val t = lot.lot_type.lowercase()
             val num = lot.lot_number.uppercase()
-            return t == "parca" || t == "et" || num.startsWith("ET-") || num.startsWith("KZM-") || num.startsWith("DN-")
+            return t == "parca" || t == "et" || num.startsWith("ET-") || num.startsWith("KZM-") || num.startsWith("DN-") || num.startsWith("PRC-") || lot.animal_ear_tag != null
         }
 
         fun isMamulLot(lot: LotItem): Boolean {
             val t = lot.lot_type.lowercase()
             val num = lot.lot_number.uppercase()
-            return t == "mamul" || num.startsWith("SCK-") || num.startsWith("SLM-") || num.startsWith("PST-")
+            val name = (lot.product_name ?: "").lowercase()
+            return t == "mamul" || num.startsWith("SCK-") || num.startsWith("SLM-") || num.startsWith("PST-") ||
+                   name.contains("sucuk") || name.contains("salam") || name.contains("sosis") || name.contains("pastırma") || name.contains("pastirma")
         }
     }
 }

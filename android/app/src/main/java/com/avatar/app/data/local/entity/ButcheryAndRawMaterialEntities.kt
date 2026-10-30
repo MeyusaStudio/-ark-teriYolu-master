@@ -22,6 +22,7 @@ data class ButcheryOperationEntity(
 @Entity(tableName = "raw_materials")
 data class RawMaterialEntity(
     @PrimaryKey val id: Int,
+    val lotId: Int? = null,
     val materialType: String,
     val quantity: Double,
     val unit: String,
@@ -30,5 +31,6 @@ data class RawMaterialEntity(
     val currency: String,
     val lotNumber: String?,
     val lotStatus: String,
+    val expiryDate: String? = null,
     val createdAt: String?
 )

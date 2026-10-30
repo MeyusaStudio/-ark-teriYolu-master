@@ -35,6 +35,14 @@ data class ProducerListing(
                 emptyMap()
             }
         }
+
+    val isCurrentlyActive: Boolean
+        get() = when (val v = isActive) {
+            is Boolean -> v
+            is Number -> v.toInt() == 1
+            is String -> v == "1" || v.equals("true", ignoreCase = true)
+            else -> true
+        }
 }
 
 data class IngredientSpec(
@@ -67,7 +75,15 @@ data class FarmerListing(
     val description: String? = null,
     @SerializedName("is_active") val isActive: Any? = true,
     @SerializedName("created_at") val createdAt: String? = null
-)
+) {
+    val isCurrentlyActive: Boolean
+        get() = when (val v = isActive) {
+            is Boolean -> v
+            is Number -> v.toInt() == 1
+            is String -> v == "1" || v.equals("true", ignoreCase = true)
+            else -> true
+        }
+}
 
 data class CreateFarmerListingRequest(
     @SerializedName("lot_id") val lotId: Int,
